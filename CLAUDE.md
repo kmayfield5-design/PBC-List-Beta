@@ -154,6 +154,9 @@ PBC-List-Beta/
         parseXlsx.js          # Excel import parser: alias map, normalisation, validation report
         __tests__/
           parseXlsx.test.js   # Vitest tests — programmatic xlsx fixtures, all-or-nothing behaviour
+      hooks/
+        useItemFilters.js     # URL-backed filter state: toggle, set, clearAll, activeFilterCount, debounced q
+        useItemsList.js       # Fetch /api/requests/:id/items with auth; stale-while-revalidate + AbortController
       components/
         Header.jsx            # Sticky top bar: logo, page title slot, right slot
         ProtectedRoute.jsx    # Redirects to / if no Supabase session
@@ -202,7 +205,12 @@ PBC-List-Beta/
 ```
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
+VITE_API_URL=http://localhost:3001
 ```
+
+`VITE_API_URL` is the base URL for the Express backend. Set it to the Railway URL in
+production. Defaults to empty string (same origin) if not set, which works when frontend
+and backend are served from the same host.
 
 ### Backend (`backend/.env`)
 

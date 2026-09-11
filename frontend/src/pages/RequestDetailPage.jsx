@@ -2,16 +2,29 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import Header from '../components/Header.jsx';
+import { useItemFilters } from '../hooks/useItemFilters.js';
+import { useItemsList } from '../hooks/useItemsList.js';
 
 const STORAGE_BUCKET = 'pbc-uploads';
 
-const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'complete'];
+const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'needs_revision', 'complete', 'not_applicable'];
+
+const STATUS_LABELS = {
+  pending:        'Pending',
+  uploaded:       'Uploaded',
+  reviewed:       'Reviewed',
+  needs_revision: 'Needs revision',
+  complete:       'Complete',
+  not_applicable: 'N/A',
+};
 
 const STATUS_STYLES = {
-  pending:  { bg: '#f0f1f5', color: '#6b7d94' },
-  uploaded: { bg: '#dbeafe', color: '#2563eb' },
-  reviewed: { bg: '#fef3c7', color: '#d97706' },
-  complete: { bg: '#d1fae5', color: '#059669' },
+  pending:        { bg: '#f0f1f5', color: '#6b7d94' },
+  uploaded:       { bg: '#dbeafe', color: '#2563eb' },
+  reviewed:       { bg: '#fef3c7', color: '#d97706' },
+  needs_revision: { bg: '#fde8e8', color: '#c0392b' },
+  complete:       { bg: '#d1fae5', color: '#059669' },
+  not_applicable: { bg: '#f0f1f5', color: '#6b7d94' },
 };
 
 const REQUEST_STATUS_OPTIONS = ['active', 'completed', 'archived'];
@@ -28,12 +41,6 @@ function formatDate(dateStr) {
   });
 }
 
-function isOverdue(deadline, status) {
-  if (!deadline || status === 'complete') return false;
-  return new Date(deadline) < new Date();
-}
-
-// Group items by area, preserving insertion order of areas
 function groupByArea(items) {
   const map = new Map();
   for (const item of items) {
@@ -48,10 +55,12 @@ export default function RequestDetailPage() {
   const { requestId } = useParams();
   const navigate = useNavigate();
 
+  const { searchText, setSearchText, clearAll, activeFilterCount, queryString } = useItemFilters();
+  const { items, loading: itemsLoading, error: itemsError, refresh } = useItemsList(requestId, queryString);
+
   const [request, setRequest] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [requestLoading, setRequestLoading] = useState(true);
+  const [requestError, setRequestError] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -64,105 +73,70 @@ export default function RequestDetailPage() {
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
 
-  // ─── Fetch ────────────────────────────────────────────────
+  // ─── Fetch request metadata ────────────────────────────────────
 
   useEffect(() => {
-    async function fetchDetail() {
-      setLoading(true);
-
+    async function fetchRequest() {
+      setRequestLoading(true);
       const { data: req, error: reqErr } = await supabase
         .from('requests')
         .select('id, project_name, status, share_token, created_at')
         .eq('id', requestId)
         .single();
-
       if (reqErr || !req) {
-        setError('Request not found.');
-        setLoading(false);
+        setRequestError('Request not found.');
+        setRequestLoading(false);
         return;
       }
-
-      const { data: itemRows, error: itemErr } = await supabase
-        .from('request_items')
-        .select('id, area, item_name, contact_email, deadline, owner, status, file_path, uploaded_at, notes')
-        .eq('request_id', requestId)
-        .order('area', { ascending: true, nullsFirst: false })
-        .order('deadline', { ascending: true, nullsFirst: false });
-
-      if (itemErr) {
-        setError('Failed to load items.');
-        setLoading(false);
-        return;
-      }
-
       setRequest(req);
-      setItems(itemRows || []);
-      setLoading(false);
+      setRequestLoading(false);
     }
-
-    fetchDetail();
+    fetchRequest();
   }, [requestId]);
 
-  // ─── Item status update ───────────────────────────────────
+  // ─── Item status update ───────────────────────────────────────
 
   async function handleItemStatusChange(itemId, newStatus) {
     setUpdatingId(itemId);
-
     const { error } = await supabase
       .from('request_items')
       .update({ status: newStatus })
       .eq('id', itemId);
-
-    if (!error) {
-      setItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, status: newStatus } : i))
-      );
-    } else {
-      console.error('Status update failed:', error.message);
-    }
-
+    if (error) console.error('Status update failed:', error.message);
+    else await refresh();
     setUpdatingId(null);
   }
 
-  // ─── Request status update ────────────────────────────────
+  // ─── Request status update ────────────────────────────────────
 
   async function handleRequestStatusChange(newStatus) {
     setRequestStatusUpdating(true);
-
     const { error } = await supabase
       .from('requests')
       .update({ status: newStatus })
       .eq('id', requestId);
-
-    if (!error) {
-      setRequest((prev) => ({ ...prev, status: newStatus }));
-    } else {
-      console.error('Request status update failed:', error.message);
-    }
-
+    if (!error) setRequest((prev) => ({ ...prev, status: newStatus }));
+    else console.error('Request status update failed:', error.message);
     setRequestStatusUpdating(false);
   }
 
-  // ─── File download ────────────────────────────────────────
+  // ─── File download ────────────────────────────────────────────
 
   async function handleDownload(item) {
     if (!item.file_path) return;
     setDownloadingId(item.id);
-
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .createSignedUrl(item.file_path, 120); // 2-minute expiry
-
+      .createSignedUrl(item.file_path, 120);
     if (error || !data?.signedUrl) {
       alert('Could not generate download link. Please try again.');
     } else {
       window.open(data.signedUrl, '_blank');
     }
-
     setDownloadingId(null);
   }
 
-  // ─── Edit item ───────────────────────────────────
+  // ─── Edit item ────────────────────────────────────────────────
 
   function handleEditStart(item) {
     setEditingId(item.id);
@@ -177,8 +151,7 @@ export default function RequestDetailPage() {
 
   async function handleEditSave(itemId) {
     setEditLoading(true);
-
-    const { data: updated, error } = await supabase
+    const { error } = await supabase
       .from('request_items')
       .update({
         area: editForm.area.trim() || null,
@@ -187,48 +160,37 @@ export default function RequestDetailPage() {
         owner: editForm.owner.trim() || null,
         deadline: editForm.deadline || null,
       })
-      .eq('id', itemId)
-      .select('id, area, item_name, contact_email, deadline, owner, status, file_path, uploaded_at, notes')
-      .single();
-
-    if (!error && updated) {
-      setItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
+      .eq('id', itemId);
+    if (!error) {
       setEditingId(null);
+      await refresh();
     } else {
       console.error('Edit save failed:', error?.message);
     }
-
     setEditLoading(false);
   }
 
-  // ─── Delete item ─────────────────────────────────
+  // ─── Delete item ──────────────────────────────────────────────
 
   async function handleDeleteItem(itemId) {
     if (!window.confirm('Remove this item from the request?')) return;
     setDeletingId(itemId);
-
     const { error } = await supabase
       .from('request_items')
       .delete()
       .eq('id', itemId);
-
-    if (!error) {
-      setItems((prev) => prev.filter((i) => i.id !== itemId));
-    } else {
-      console.error('Delete failed:', error.message);
-    }
-
+    if (error) console.error('Delete failed:', error.message);
+    else await refresh();
     setDeletingId(null);
   }
 
-  // ─── Add item ─────────────────────────────────────
+  // ─── Add item ─────────────────────────────────────────────────
 
   async function handleAddItem(e) {
     e.preventDefault();
     if (!addForm.item_name.trim() || !addForm.contact_email.trim()) return;
     setAddLoading(true);
-
-    const { data: newItem, error } = await supabase
+    const { error } = await supabase
       .from('request_items')
       .insert({
         request_id: requestId,
@@ -238,47 +200,41 @@ export default function RequestDetailPage() {
         deadline: addForm.deadline || null,
         owner: addForm.owner.trim() || null,
         status: 'pending',
-      })
-      .select('id, area, item_name, contact_email, deadline, owner, status, file_path, uploaded_at, notes')
-      .single();
-
-    if (!error && newItem) {
-      setItems((prev) => [...prev, newItem]);
+      });
+    if (!error) {
       setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
       setShowAddForm(false);
+      await refresh();
     } else {
       console.error('Add item failed:', error?.message);
     }
-
     setAddLoading(false);
   }
 
-  // ─── Share link ───────────────────────────────────────────
+  // ─── Share link ───────────────────────────────────────────────
 
   function copyShareLink() {
     if (!request) return;
-    navigator.clipboard.writeText(
-      `${window.location.origin}/request/${request.share_token}`
-    );
+    navigator.clipboard.writeText(`${window.location.origin}/request/${request.share_token}`);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  // ─── Derived stats ────────────────────────────────────────
+  // ─── Derived stats ────────────────────────────────────────────
 
-  const total = items.length;
-  const complete = items.filter((i) => i.status === 'complete').length;
-  const uploaded = items.filter((i) => i.status === 'uploaded').length;
-  const pct = total ? Math.round((complete / total) * 100) : 0;
+  const itemCount = items.length;
+  const completeCount = items.filter((i) => i.status === 'complete').length;
+  const uploadedCount = items.filter((i) => i.status === 'uploaded').length;
+  const pct = itemCount ? Math.round((completeCount / itemCount) * 100) : 0;
 
-  // ─── Render ───────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────
 
-  if (loading) {
+  if (requestLoading) {
     return <div style={styles.center}>Loading…</div>;
   }
 
-  if (error) {
-    return <div style={styles.center}><p style={{ color: '#c0392b' }}>{error}</p></div>;
+  if (requestError) {
+    return <div style={styles.center}><p style={{ color: '#c0392b' }}>{requestError}</p></div>;
   }
 
   const grouped = groupByArea(items);
@@ -287,23 +243,17 @@ export default function RequestDetailPage() {
   return (
     <div style={styles.page}>
       <Header
-        title={request?.project_name ?? 'Request Detail'}
+        title={request?.project_name ?? 'Request detail'}
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <select
               value={request.status}
               onChange={(e) => handleRequestStatusChange(e.target.value)}
               disabled={requestStatusUpdating}
-              style={{
-                ...styles.statusSelect,
-                backgroundColor: reqStatus.bg,
-                color: reqStatus.color,
-              }}
+              style={{ ...styles.statusSelect, backgroundColor: reqStatus.bg, color: reqStatus.color }}
             >
               {REQUEST_STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
             </select>
             <button style={styles.copyBtn} onClick={copyShareLink}>
@@ -312,9 +262,8 @@ export default function RequestDetailPage() {
           </div>
         }
       />
-      <div style={styles.container}>
 
-        {/* Back */}
+      <div style={styles.container}>
         <button style={styles.backBtn} onClick={() => navigate('/dashboard')}>
           ← Dashboard
         </button>
@@ -328,21 +277,49 @@ export default function RequestDetailPage() {
               <p style={styles.meta}>Created {formatDate(request.created_at)}</p>
             </div>
           </div>
-
-          {/* Progress bar */}
           <div style={styles.progressRow}>
             <div style={styles.progressTrack}>
               <div style={{ ...styles.progressFill, width: `${pct}%` }} />
             </div>
             <span style={styles.progressLabel}>
-              {complete}/{total} complete
-              {uploaded > 0 && ` · ${uploaded} awaiting review`}
+              {completeCount}/{itemCount} complete
+              {uploadedCount > 0 && ` · ${uploadedCount} awaiting review`}
             </span>
           </div>
         </div>
 
-        {/* Items */}
-        <div style={styles.tableCard}>
+        {/* Filter bar */}
+        <div style={styles.filterBar}>
+          <input
+            type="search"
+            placeholder="Search items…"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={styles.searchInput}
+          />
+          {activeFilterCount > 0 && (
+            <>
+              <span style={styles.filterCount}>
+                {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active
+              </span>
+              <button style={styles.clearBtn} onClick={clearAll}>Clear all</button>
+            </>
+          )}
+          {itemsLoading && items.length > 0 && (
+            <span style={styles.loadingHint}>Updating…</span>
+          )}
+        </div>
+
+        {/* Items table */}
+        <div style={{ ...styles.tableCard, opacity: itemsLoading && items.length === 0 ? 0.5 : 1 }}>
+          {itemsError && (
+            <p style={{ padding: '16px', color: '#c0392b', margin: 0 }}>{itemsError}</p>
+          )}
+          {!itemsError && items.length === 0 && !itemsLoading && (
+            <p style={{ padding: '24px 16px', color: '#6b7d94', margin: 0, textAlign: 'center' }}>
+              No items match the current filters.
+            </p>
+          )}
           {items.length > 0 && (
             <table style={styles.table}>
               <thead>
@@ -363,10 +340,14 @@ export default function RequestDetailPage() {
                     <tr key={`area-${area}`}>
                       <td colSpan={8} style={styles.areaHeader}>{area}</td>
                     </tr>
-
                     {areaItems.map((item) => {
                       const isEditing = editingId === item.id;
-                      const overdue = isOverdue(item.deadline, item.status);
+                      // Prefer the computed is_overdue from the enriched view; fall back to client-side check
+                      const overdue = item.is_overdue ?? (
+                        item.deadline && item.status !== 'complete' && item.status !== 'not_applicable'
+                          ? new Date(item.deadline) < new Date()
+                          : false
+                      );
                       const s = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
 
                       if (isEditing) {
@@ -438,6 +419,9 @@ export default function RequestDetailPage() {
                         <tr key={item.id} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.itemName}>{item.item_name}</span>
+                            {item.ref_code && (
+                              <span style={styles.refCode}>{item.ref_code}</span>
+                            )}
                             {item.notes && <span style={styles.notes}>{item.notes}</span>}
                           </td>
                           <td style={styles.td}>
@@ -453,16 +437,10 @@ export default function RequestDetailPage() {
                               value={item.status}
                               onChange={(e) => handleItemStatusChange(item.id, e.target.value)}
                               disabled={updatingId === item.id}
-                              style={{
-                                ...styles.itemStatusSelect,
-                                backgroundColor: s.bg,
-                                color: s.color,
-                              }}
+                              style={{ ...styles.itemStatusSelect, backgroundColor: s.bg, color: s.color }}
                             >
                               {STATUS_OPTIONS.map((o) => (
-                                <option key={o} value={o}>
-                                  {o.charAt(0).toUpperCase() + o.slice(1)}
-                                </option>
+                                <option key={o} value={o}>{STATUS_LABELS[o] ?? o}</option>
                               ))}
                             </select>
                           </td>
@@ -550,7 +528,10 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 style={styles.addCancelBtn}
-                onClick={() => { setShowAddForm(false); setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' }); }}
+                onClick={() => {
+                  setShowAddForm(false);
+                  setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
+                }}
               >
                 Cancel
               </button>
@@ -568,317 +549,158 @@ export default function RequestDetailPage() {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    backgroundColor: '#fafbfc',
-  },
-  container: {
-    maxWidth: '1050px',
-    margin: '0 auto',
-    padding: '24px 24px 60px',
-  },
+  page: { minHeight: '100vh', backgroundColor: '#fafbfc' },
+  container: { maxWidth: '1050px', margin: '0 auto', padding: '24px 24px 60px' },
   center: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#6b7d94',
+    minHeight: '100vh', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', color: '#6b7d94',
   },
   backBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#6b7d94',
-    fontSize: '13px',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    cursor: 'pointer',
-    padding: '0 0 16px',
-    display: 'block',
+    background: 'none', border: 'none', color: '#6b7d94', fontSize: '13px',
+    fontFamily: 'Arial, Helvetica, sans-serif', cursor: 'pointer', padding: '0 0 16px', display: 'block',
   },
   headerCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    border: '1px solid #dadde6',
-    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
-    padding: '28px',
-    marginBottom: '16px',
+    backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)', padding: '28px', marginBottom: '16px',
   },
   headerTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: '16px',
-    marginBottom: '20px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    flexWrap: 'wrap', gap: '16px', marginBottom: '20px',
   },
   eyebrow: {
-    fontSize: '11px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    color: '#6b7d94',
-    margin: '0 0 4px',
+    fontSize: '11px', fontWeight: '700', fontFamily: 'Arial, Helvetica, sans-serif',
+    textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b7d94', margin: '0 0 4px',
   },
   heading: {
-    fontSize: '22px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#071739',
-    margin: '0 0 4px',
+    fontSize: '22px', fontWeight: '700', fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739', margin: '0 0 4px',
   },
-  meta: {
-    fontSize: '13px',
-    color: '#6b7d94',
-    margin: 0,
-  },
+  meta: { fontSize: '13px', color: '#6b7d94', margin: 0 },
   statusSelect: {
-    padding: '6px 10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    border: 'none',
-    borderRadius: '99px',
-    cursor: 'pointer',
-    outline: 'none',
+    padding: '6px 10px', fontSize: '13px', fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif', border: 'none', borderRadius: '99px',
+    cursor: 'pointer', outline: 'none',
   },
   copyBtn: {
-    padding: '7px 14px',
-    fontSize: '13px',
-    fontWeight: '500',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#071739',
-    backgroundColor: '#fff',
-    border: '1px solid #dadde6',
-    borderRadius: '8px',
-    cursor: 'pointer',
+    padding: '7px 14px', fontSize: '13px', fontWeight: '500',
+    fontFamily: 'Arial, Helvetica, sans-serif', color: '#071739', backgroundColor: '#fff',
+    border: '1px solid #dadde6', borderRadius: '8px', cursor: 'pointer',
   },
-  progressRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
+  progressRow: { display: 'flex', alignItems: 'center', gap: '12px' },
   progressTrack: {
-    flex: 1,
-    height: '6px',
-    backgroundColor: '#dadde6',
-    borderRadius: '99px',
-    overflow: 'hidden',
-    maxWidth: '320px',
+    flex: 1, height: '6px', backgroundColor: '#dadde6',
+    borderRadius: '99px', overflow: 'hidden', maxWidth: '320px',
   },
   progressFill: {
-    height: '100%',
-    backgroundColor: '#379190',
-    borderRadius: '99px',
-    transition: 'width 0.3s ease',
+    height: '100%', backgroundColor: '#379190', borderRadius: '99px', transition: 'width 0.3s ease',
   },
-  progressLabel: {
-    fontSize: '13px',
-    color: '#6b7d94',
-    whiteSpace: 'nowrap',
+  progressLabel: { fontSize: '13px', color: '#6b7d94', whiteSpace: 'nowrap' },
+  filterBar: {
+    display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap',
   },
+  searchInput: {
+    flex: '1 1 220px', maxWidth: '360px', padding: '7px 12px', fontSize: '13px',
+    border: '1.5px solid #dadde6', borderRadius: '8px', outline: 'none',
+    color: '#071739', backgroundColor: '#fff', fontFamily: 'Verdana, Geneva, sans-serif',
+  },
+  filterCount: {
+    fontSize: '12px', fontWeight: '600', fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382', whiteSpace: 'nowrap',
+  },
+  clearBtn: {
+    padding: '5px 10px', fontSize: '12px', fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
+    borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
+  },
+  loadingHint: { fontSize: '12px', color: '#6b7d94', fontStyle: 'italic' },
   tableCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    border: '1px solid #dadde6',
-    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
-    overflow: 'hidden',
+    backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)', overflow: 'hidden', transition: 'opacity 0.15s',
   },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
+  table: { width: '100%', borderCollapse: 'collapse' },
   th: {
-    padding: '12px 16px',
-    fontSize: '11px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: '#6b7d94',
-    textAlign: 'left',
-    borderBottom: '1px solid #dadde6',
-    backgroundColor: '#fafbfc',
-    whiteSpace: 'nowrap',
+    padding: '12px 16px', fontSize: '11px', fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em',
+    color: '#6b7d94', textAlign: 'left', borderBottom: '1px solid #dadde6',
+    backgroundColor: '#fafbfc', whiteSpace: 'nowrap',
   },
   areaHeader: {
-    padding: '10px 16px',
-    fontSize: '11px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    textTransform: 'uppercase',
-    letterSpacing: '0.07em',
-    color: '#4c6382',
-    backgroundColor: '#fafbfc',
-    borderTop: '1px solid #dadde6',
-    borderBottom: '1px solid #dadde6',
+    padding: '10px 16px', fontSize: '11px', fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', letterSpacing: '0.07em',
+    color: '#4c6382', backgroundColor: '#fafbfc',
+    borderTop: '1px solid #dadde6', borderBottom: '1px solid #dadde6',
   },
-  tr: {
-    borderBottom: '1px solid #f0f1f5',
+  tr: { borderBottom: '1px solid #f0f1f5' },
+  td: { padding: '13px 16px', fontSize: '14px', color: '#071739', verticalAlign: 'top' },
+  itemName: { display: 'block', fontWeight: '500' },
+  refCode: {
+    display: 'block', fontSize: '11px', color: '#6b7d94', marginTop: '2px',
+    fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em',
   },
-  td: {
-    padding: '13px 16px',
-    fontSize: '14px',
-    color: '#071739',
-    verticalAlign: 'top',
-  },
-  itemName: {
-    display: 'block',
-    fontWeight: '500',
-  },
-  notes: {
-    display: 'block',
-    fontSize: '12px',
-    color: '#6b7d94',
-    marginTop: '2px',
-  },
-  contactEmail: {
-    fontSize: '13px',
-    color: '#4c6382',
-  },
+  notes: { display: 'block', fontSize: '12px', color: '#6b7d94', marginTop: '2px' },
+  contactEmail: { fontSize: '13px', color: '#4c6382' },
   overdueTag: {
-    display: 'inline-block',
-    marginLeft: '6px',
-    fontSize: '10px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    textTransform: 'uppercase',
-    color: '#c0392b',
-    backgroundColor: '#fde8e8',
-    padding: '1px 5px',
-    borderRadius: '4px',
+    display: 'inline-block', marginLeft: '6px', fontSize: '10px', fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase',
+    color: '#c0392b', backgroundColor: '#fde8e8', padding: '1px 5px', borderRadius: '4px',
   },
   itemStatusSelect: {
-    padding: '4px 8px',
-    fontSize: '12px',
-    fontWeight: '600',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    border: 'none',
-    borderRadius: '99px',
-    cursor: 'pointer',
-    outline: 'none',
+    padding: '4px 8px', fontSize: '12px', fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif', border: 'none', borderRadius: '99px',
+    cursor: 'pointer', outline: 'none',
   },
   downloadBtn: {
-    padding: '4px 10px',
-    fontSize: '12px',
-    fontWeight: '500',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#2563eb',
-    backgroundColor: '#dbeafe',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    padding: '4px 10px', fontSize: '12px', fontWeight: '500',
+    fontFamily: 'Arial, Helvetica, sans-serif', color: '#2563eb', backgroundColor: '#dbeafe',
+    border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
   },
   deleteBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#6b7d94',
-    fontSize: '18px',
-    lineHeight: 1,
-    cursor: 'pointer',
-    padding: '0 4px',
-    borderRadius: '4px',
+    background: 'none', border: 'none', color: '#6b7d94', fontSize: '18px',
+    lineHeight: 1, cursor: 'pointer', padding: '0 4px', borderRadius: '4px',
   },
   editIconBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#6b7d94',
-    fontSize: '15px',
-    lineHeight: 1,
-    cursor: 'pointer',
-    padding: '0 4px',
-    borderRadius: '4px',
-    marginRight: '2px',
+    background: 'none', border: 'none', color: '#6b7d94', fontSize: '15px',
+    lineHeight: 1, cursor: 'pointer', padding: '0 4px', borderRadius: '4px', marginRight: '2px',
   },
   editInput: {
-    display: 'block',
-    width: '100%',
-    padding: '5px 8px',
-    fontSize: '13px',
-    border: '1.5px solid #dadde6',
-    borderRadius: '6px',
-    outline: 'none',
-    color: '#071739',
-    backgroundColor: '#fff',
+    display: 'block', width: '100%', padding: '5px 8px', fontSize: '13px',
+    border: '1.5px solid #dadde6', borderRadius: '6px', outline: 'none',
+    color: '#071739', backgroundColor: '#fff',
   },
   editSaveBtn: {
-    padding: '5px 12px',
-    fontSize: '12px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#fff',
-    backgroundColor: '#379190',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    marginRight: '6px',
+    padding: '5px 12px', fontSize: '12px', fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif', color: '#fff', backgroundColor: '#379190',
+    border: 'none', borderRadius: '6px', cursor: 'pointer', marginRight: '6px',
   },
   editCancelBtn: {
-    padding: '5px 10px',
-    fontSize: '12px',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382',
-    backgroundColor: 'transparent',
-    border: '1px solid #dadde6',
-    borderRadius: '6px',
-    cursor: 'pointer',
+    padding: '5px 10px', fontSize: '12px', fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
+    borderRadius: '6px', cursor: 'pointer',
   },
-  addRow: {
-    padding: '12px 16px',
-    borderTop: '1px solid #dadde6',
-  },
+  addRow: { padding: '12px 16px', borderTop: '1px solid #dadde6' },
   addBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#4c6382',
-    fontSize: '13px',
-    fontWeight: '600',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    cursor: 'pointer',
-    padding: '4px 0',
+    background: 'none', border: 'none', color: '#4c6382', fontSize: '13px', fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif', cursor: 'pointer', padding: '4px 0',
   },
   addForm: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-    padding: '12px 16px',
-    borderTop: '1px solid #dadde6',
-    flexWrap: 'wrap',
+    display: 'flex', gap: '8px', alignItems: 'center',
+    padding: '12px 16px', borderTop: '1px solid #dadde6', flexWrap: 'wrap',
   },
   addInput: {
-    flex: 1,
-    minWidth: '100px',
-    padding: '7px 10px',
-    fontSize: '13px',
-    border: '1.5px solid #dadde6',
-    borderRadius: '6px',
-    outline: 'none',
-    color: '#071739',
+    flex: 1, minWidth: '100px', padding: '7px 10px', fontSize: '13px',
+    border: '1.5px solid #dadde6', borderRadius: '6px', outline: 'none', color: '#071739',
   },
   addSaveBtn: {
-    padding: '7px 16px',
-    fontSize: '13px',
-    fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#fff',
-    backgroundColor: '#379190',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    padding: '7px 16px', fontSize: '13px', fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif', color: '#fff', backgroundColor: '#379190',
+    border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
   },
   addCancelBtn: {
-    padding: '7px 12px',
-    fontSize: '13px',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382',
-    backgroundColor: 'transparent',
-    border: '1px solid #dadde6',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    padding: '7px 12px', fontSize: '13px', fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
+    borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
   },
 };
