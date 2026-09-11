@@ -1,16 +1,19 @@
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import AdvisorLoginPage from './pages/AdvisorLoginPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 
-function LoginRoute() {
+function ClientLoginRoute() {
   const { shareToken } = useParams();
   const navigate = useNavigate();
-
-  function handleLoginSuccess(token, redirectTo) {
-    navigate(redirectTo);
-  }
-
-  return <LoginPage shareToken={shareToken} onLoginSuccess={handleLoginSuccess} />;
+  return (
+    <LoginPage
+      shareToken={shareToken}
+      onLoginSuccess={(_token, redirectTo) => navigate(redirectTo)}
+    />
+  );
 }
 
 function NotFound() {
@@ -26,10 +29,23 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Email-gated entry point — share link lands here */}
-        <Route path="/request/:shareToken" element={<LoginRoute />} />
+        {/* Advisor routes */}
+        <Route path="/" element={<AdvisorLoginPage />} />
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><DashboardPage /></ProtectedRoute>}
+        />
+        <Route
+          path="/dashboard/new"
+          element={<ProtectedRoute><div style={{ padding: 40, fontFamily: 'sans-serif' }}>Create request — coming soon.</div></ProtectedRoute>}
+        />
+        <Route
+          path="/dashboard/:requestId"
+          element={<ProtectedRoute><div style={{ padding: 40, fontFamily: 'sans-serif' }}>Request detail — coming soon.</div></ProtectedRoute>}
+        />
 
-        {/* Upload page — rendered after successful OTP verification */}
+        {/* Client routes */}
+        <Route path="/request/:shareToken" element={<ClientLoginRoute />} />
         <Route path="/upload/:requestId" element={<UploadPage />} />
 
         {/* Catch-all */}

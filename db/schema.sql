@@ -57,6 +57,26 @@ CREATE TABLE audit_log (
   details     JSONB       NOT NULL DEFAULT '{}'
 );
 
+-- ─── RLS Policies ────────────────────────────────────────────
+
+ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Advisors can read requests"
+  ON requests FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Advisors can insert requests"
+  ON requests FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = created_by);
+
+ALTER TABLE request_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Advisors can read items"
+  ON request_items FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Advisors can insert items"
+  ON request_items FOR INSERT TO authenticated
+  WITH CHECK (true);
+
 -- ─── Indexes ─────────────────────────────────────────────────
 
 CREATE UNIQUE INDEX idx_requests_share_token
