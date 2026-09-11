@@ -9,22 +9,18 @@ export default function AuthCallbackPage() {
   const [status, setStatus] = useState('Signing you in…');
 
   useEffect(() => {
-    // Supabase detects the magic link tokens in the URL hash automatically.
-    // We listen for SIGNED_IN and then validate email authorization.
+    // INITIAL_SESSION fires when Supabase finishes processing magic link tokens
+    // from the URL hash. SIGNED_IN covers re-auth cases.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
+        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session) {
           await validateAndRedirect(session);
-        } else if (event === 'SIGNED_OUT') {
-          redirectToLogin('Sign-in failed. Please try again.');
+        } else if (event === 'INITIAL_SESSION' && !session) {
+          // Page loaded but no tokens found — link expired or URL not whitelisted
+          setStatus('Sign-in link expired or invalid. Please request a new one.');
         }
       }
     );
-
-    // Also check if there's already a session (e.g. page reloaded after auth)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) validateAndRedirect(session);
-    });
 
     return () => subscription.unsubscribe();
   }, [shareToken]); // eslint-disable-line react-hooks/exhaustive-deps
