@@ -19,6 +19,7 @@ CREATE TABLE request_items (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id  UUID        NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
   contact_email TEXT      NOT NULL,
+  area        TEXT,
   item_name   TEXT        NOT NULL,
   deadline    DATE,
   owner       TEXT,

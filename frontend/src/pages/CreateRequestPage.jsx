@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase.js';
 
 function generateShareToken() {
@@ -8,11 +9,31 @@ function generateShareToken() {
 
 const BLANK_ITEM = () => ({
   _id: crypto.randomUUID(),
+  area: '',
   itemName: '',
   contactEmail: '',
   deadline: '',
   owner: '',
 });
+
+// Normalise an Excel date serial or string to YYYY-MM-DD (or empty string)
+function normaliseDate(value) {
+  if (!value) return '';
+  if (typeof value === 'number') {
+    // Excel date serial → JS Date
+    const date = XLSX.SSF.parse_date_code(value);
+    if (!date) return '';
+    const mm = String(date.m).padStart(2, '0');
+    const dd = String(date.d).padStart(2, '0');
+    return `${date.y}-${mm}-${dd}`;
+  }
+  // Already a string — accept YYYY-MM-DD or MM/DD/YYYY
+  const iso = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const d = new Date(iso);
+  if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  return '';
+}
 
 export default function CreateRequestPage() {
   const navigate = useNavigate();
@@ -21,8 +42,10 @@ export default function CreateRequestPage() {
   const [items, setItems] = useState([BLANK_ITEM()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [created, setCreated] = useState(null); // { shareToken, requestId }
+  const [importError, setImportError] = useState('');
+  const [created, setCreated] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const importRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -42,6 +65,67 @@ export default function CreateRequestPage() {
     setItems((prev) =>
       prev.map((item) => (item._id === id ? { ...item, [field]: value } : item))
     );
+  }
+
+  // ─── Excel export (template) ──────────────────────────────
+
+  function exportTemplate() {
+    const rows = [
+      ['Area', 'Item Name', 'Contact Email', 'Deadline (YYYY-MM-DD)', 'Owner'],
+      ['Financial Statements', 'Audited financials FY2024', 'cfo@client.com', '2026-10-15', 'Jane Smith'],
+      ['Legal', 'Articles of incorporation', 'legal@client.com', '2026-10-20', 'John Doe'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 24 }, { wch: 36 }, { wch: 30 }, { wch: 22 }, { wch: 20 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Request Items');
+    XLSX.writeFile(wb, 'data-request-template.xlsx');
+  }
+
+  // ─── Excel import ─────────────────────────────────────────
+
+  function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImportError('');
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (rows.length === 0) {
+          setImportError('The file appears to be empty.');
+          return;
+        }
+
+        const imported = rows
+          .map((row) => ({
+            _id: crypto.randomUUID(),
+            area: String(row['Area'] ?? '').trim(),
+            itemName: String(row['Item Name'] ?? '').trim(),
+            contactEmail: String(row['Contact Email'] ?? '').trim(),
+            deadline: normaliseDate(row['Deadline (YYYY-MM-DD)'] ?? row['Deadline'] ?? ''),
+            owner: String(row['Owner'] ?? '').trim(),
+          }))
+          .filter((i) => i.itemName || i.contactEmail);
+
+        if (imported.length === 0) {
+          setImportError('No valid rows found. Make sure columns match the template headers.');
+          return;
+        }
+
+        setItems(imported);
+      } catch {
+        setImportError('Could not read the file. Make sure it is a valid .xlsx or .csv.');
+      } finally {
+        // Reset so the same file can be re-imported
+        if (importRef.current) importRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   // ─── Submit ───────────────────────────────────────────────
@@ -94,6 +178,7 @@ export default function CreateRequestPage() {
     const { error: itemsError } = await supabase.from('request_items').insert(
       validItems.map((item) => ({
         request_id: request.id,
+        area: item.area.trim() || null,
         item_name: item.itemName.trim(),
         contact_email: item.contactEmail.trim().toLowerCase(),
         deadline: item.deadline || null,
@@ -154,12 +239,11 @@ export default function CreateRequestPage() {
     <div style={styles.page}>
       <div style={styles.container}>
 
-        {/* Header */}
         <div style={styles.header}>
           <button style={styles.backBtn} onClick={() => navigate('/dashboard')}>
             ← Dashboard
           </button>
-          <h1 style={styles.heading}>New data request</h1>
+          <h1 style={styles.heading}>Create New Client Data Request Manager</h1>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -181,14 +265,38 @@ export default function CreateRequestPage() {
           {/* Items */}
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
-              <span style={styles.sectionTitle}>Request items</span>
-              <span style={styles.sectionHint}>
-                Each item will appear as a row the client uploads to.
-              </span>
+              <div>
+                <span style={styles.sectionTitle}>Request items</span>
+                <span style={styles.sectionHint}>
+                  Each item will appear as a row the client uploads to.
+                </span>
+              </div>
+              <div style={styles.importExportGroup}>
+                <button type="button" style={styles.outlineBtn} onClick={exportTemplate}>
+                  ↓ Download template
+                </button>
+                <button
+                  type="button"
+                  style={styles.outlineBtn}
+                  onClick={() => importRef.current?.click()}
+                >
+                  ↑ Import from Excel
+                </button>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: 'none' }}
+                  onChange={handleImport}
+                />
+              </div>
             </div>
+
+            {importError && <p style={styles.importError}>{importError}</p>}
 
             {/* Column headers */}
             <div style={styles.itemHeader}>
+              <span style={{ ...styles.col, flex: 2 }}>Area</span>
               <span style={{ ...styles.col, flex: 3 }}>Item name <span style={styles.req}>*</span></span>
               <span style={{ ...styles.col, flex: 3 }}>Contact email <span style={styles.req}>*</span></span>
               <span style={{ ...styles.col, flex: 2 }}>Deadline</span>
@@ -198,6 +306,14 @@ export default function CreateRequestPage() {
 
             {items.map((item, idx) => (
               <div key={item._id} style={styles.itemRow}>
+                <input
+                  type="text"
+                  placeholder="e.g. Legal"
+                  value={item.area}
+                  onChange={(e) => updateItem(item._id, 'area', e.target.value)}
+                  style={{ ...styles.cellInput, flex: 2 }}
+                  disabled={loading}
+                />
                 <input
                   type="text"
                   placeholder={`Item ${idx + 1}`}
@@ -253,7 +369,6 @@ export default function CreateRequestPage() {
 
           {error && <p style={styles.error}>{error}</p>}
 
-          {/* Actions */}
           <div style={styles.formActions}>
             <button
               type="button"
@@ -287,7 +402,7 @@ const styles = {
     padding: '40px 24px',
   },
   container: {
-    maxWidth: '860px',
+    maxWidth: '1000px',
     margin: '0 auto',
   },
   header: {
@@ -334,18 +449,46 @@ const styles = {
   },
   sectionHeader: {
     display: 'flex',
-    alignItems: 'baseline',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: '12px',
     marginBottom: '16px',
+    flexWrap: 'wrap',
   },
   sectionTitle: {
+    display: 'block',
     fontSize: '13px',
     fontWeight: '600',
     color: '#333',
+    marginBottom: '2px',
   },
   sectionHint: {
     fontSize: '12px',
     color: '#aaa',
+  },
+  importExportGroup: {
+    display: 'flex',
+    gap: '8px',
+    flexShrink: 0,
+  },
+  outlineBtn: {
+    padding: '6px 12px',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#444',
+    backgroundColor: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  importError: {
+    fontSize: '13px',
+    color: '#c0392b',
+    backgroundColor: '#fde8e8',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    marginBottom: '12px',
   },
   itemHeader: {
     display: 'flex',
