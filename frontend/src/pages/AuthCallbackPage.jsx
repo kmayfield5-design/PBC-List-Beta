@@ -44,7 +44,7 @@ export default function AuthCallbackPage() {
       .eq('share_token', shareToken)
       .maybeSingle();
 
-    console.log('[AuthCallback] request lookup:', { request, reqErr });
+    console.log('[AuthCallback] request lookup: id=', request?.id, 'err=', reqErr?.message);
 
     if (reqErr || !request) {
       await supabase.auth.signOut();
@@ -58,7 +58,8 @@ export default function AuthCallbackPage() {
       .select('id, contact_email')
       .eq('request_id', request.id);
 
-    console.log('[AuthCallback] all items for request:', { allItems, itemErr });
+    console.log('[AuthCallback] itemErr:', itemErr?.message);
+    console.log('[AuthCallback] allItems:', JSON.stringify(allItems));
     console.log('[AuthCallback] looking for email:', email);
 
     const item = allItems?.find(
