@@ -8,11 +8,25 @@ require('dotenv').config();
  * On failure, returns 401.
  */
 function verifyJWT(req, res, next) {
-  // TODO: Extract Bearer token from req.headers.authorization
-  // TODO: Return 401 if header is missing or malformed
-  // TODO: jwt.verify(token, process.env.JWT_SECRET, callback)
-  // TODO: On error (expired, invalid signature), return 401 with descriptive message
-  // TODO: On success, set req.user = decoded payload, call next()
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Authorization header missing or malformed.' });
+  }
+
+  const token = authHeader.slice(7); // strip "Bearer "
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      const message = err.name === 'TokenExpiredError'
+        ? 'Session expired. Please log in again.'
+        : 'Invalid token.';
+      return res.status(401).json({ success: false, message });
+    }
+
+    req.user = decoded;
+    next();
+  });
 }
 
 module.exports = { verifyJWT };

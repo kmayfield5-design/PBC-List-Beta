@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const requestRoutes = require('./routes/requests');
 
 const app = express();
 
@@ -10,8 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-
-// TODO: Mount additional route groups here (e.g. /api/requests, /api/items)
+app.use('/api/requests', requestRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
