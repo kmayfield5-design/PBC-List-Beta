@@ -53,8 +53,12 @@ export default function RequestDetailPage() {
   const [error, setError] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [requestStatusUpdating, setRequestStatusUpdating] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
+  const [addLoading, setAddLoading] = useState(false);
 
   // ─── Fetch ────────────────────────────────────────────────
 
@@ -154,6 +158,58 @@ export default function RequestDetailPage() {
     setDownloadingId(null);
   }
 
+  // ─── Delete item ─────────────────────────────────
+
+  async function handleDeleteItem(itemId) {
+    if (!window.confirm('Remove this item from the request?')) return;
+    setDeletingId(itemId);
+
+    const { error } = await supabase
+      .from('request_items')
+      .delete()
+      .eq('id', itemId);
+
+    if (!error) {
+      setItems((prev) => prev.filter((i) => i.id !== itemId));
+    } else {
+      console.error('Delete failed:', error.message);
+    }
+
+    setDeletingId(null);
+  }
+
+  // ─── Add item ─────────────────────────────────────
+
+  async function handleAddItem(e) {
+    e.preventDefault();
+    if (!addForm.item_name.trim() || !addForm.contact_email.trim()) return;
+    setAddLoading(true);
+
+    const { data: newItem, error } = await supabase
+      .from('request_items')
+      .insert({
+        request_id: requestId,
+        area: addForm.area.trim() || null,
+        item_name: addForm.item_name.trim(),
+        contact_email: addForm.contact_email.trim().toLowerCase(),
+        deadline: addForm.deadline || null,
+        owner: addForm.owner.trim() || null,
+        status: 'pending',
+      })
+      .select('id, area, item_name, contact_email, deadline, owner, status, file_path, uploaded_at, notes')
+      .single();
+
+    if (!error && newItem) {
+      setItems((prev) => [...prev, newItem]);
+      setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
+      setShowAddForm(false);
+    } else {
+      console.error('Add item failed:', error?.message);
+    }
+
+    setAddLoading(false);
+  }
+
   // ─── Share link ───────────────────────────────────────────
 
   function copyShareLink() {
@@ -239,10 +295,8 @@ export default function RequestDetailPage() {
         </div>
 
         {/* Items */}
-        {items.length === 0 ? (
-          <p style={{ color: '#888', marginTop: 32 }}>No items on this request.</p>
-        ) : (
-          <div style={styles.tableCard}>
+        <div style={styles.tableCard}>
+          {items.length > 0 && (
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -253,16 +307,14 @@ export default function RequestDetailPage() {
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>File</th>
                   <th style={styles.th}>Uploaded</th>
+                  <th style={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
                 {Array.from(grouped.entries()).map(([area, areaItems]) => (
                   <>
-                    {/* Area group header */}
                     <tr key={`area-${area}`}>
-                      <td colSpan={7} style={styles.areaHeader}>
-                        {area}
-                      </td>
+                      <td colSpan={8} style={styles.areaHeader}>{area}</td>
                     </tr>
 
                     {areaItems.map((item) => {
@@ -273,9 +325,7 @@ export default function RequestDetailPage() {
                         <tr key={item.id} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.itemName}>{item.item_name}</span>
-                            {item.notes && (
-                              <span style={styles.notes}>{item.notes}</span>
-                            )}
+                            {item.notes && <span style={styles.notes}>{item.notes}</span>}
                           </td>
                           <td style={styles.td}>
                             <span style={styles.contactEmail}>{item.contact_email}</span>
@@ -319,6 +369,16 @@ export default function RequestDetailPage() {
                           <td style={{ ...styles.td, fontSize: '12px', color: '#888' }}>
                             {item.uploaded_at ? formatDate(item.uploaded_at) : '—'}
                           </td>
+                          <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px' }}>
+                            <button
+                              style={styles.deleteBtn}
+                              onClick={() => handleDeleteItem(item.id)}
+                              disabled={deletingId === item.id}
+                              title="Remove item"
+                            >
+                              {deletingId === item.id ? '…' : '×'}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -326,8 +386,63 @@ export default function RequestDetailPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+
+          {/* Add item form */}
+          {showAddForm ? (
+            <form onSubmit={handleAddItem} style={styles.addForm}>
+              <input
+                style={styles.addInput}
+                placeholder="Area"
+                value={addForm.area}
+                onChange={(e) => setAddForm((f) => ({ ...f, area: e.target.value }))}
+              />
+              <input
+                style={{ ...styles.addInput, flex: 2 }}
+                placeholder="Item name *"
+                required
+                value={addForm.item_name}
+                onChange={(e) => setAddForm((f) => ({ ...f, item_name: e.target.value }))}
+              />
+              <input
+                style={{ ...styles.addInput, flex: 2 }}
+                placeholder="Contact email *"
+                type="email"
+                required
+                value={addForm.contact_email}
+                onChange={(e) => setAddForm((f) => ({ ...f, contact_email: e.target.value }))}
+              />
+              <input
+                style={styles.addInput}
+                placeholder="Owner"
+                value={addForm.owner}
+                onChange={(e) => setAddForm((f) => ({ ...f, owner: e.target.value }))}
+              />
+              <input
+                style={styles.addInput}
+                type="date"
+                value={addForm.deadline}
+                onChange={(e) => setAddForm((f) => ({ ...f, deadline: e.target.value }))}
+              />
+              <button type="submit" style={styles.addSaveBtn} disabled={addLoading}>
+                {addLoading ? 'Saving…' : 'Add'}
+              </button>
+              <button
+                type="button"
+                style={styles.addCancelBtn}
+                onClick={() => { setShowAddForm(false); setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' }); }}
+              >
+                Cancel
+              </button>
+            </form>
+          ) : (
+            <div style={styles.addRow}>
+              <button style={styles.addBtn} onClick={() => setShowAddForm(true)}>
+                + Add item
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -528,6 +643,69 @@ const styles = {
     color: '#1d4ed8',
     backgroundColor: '#dbeafe',
     border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  deleteBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#bbb',
+    fontSize: '18px',
+    lineHeight: 1,
+    cursor: 'pointer',
+    padding: '0 4px',
+    borderRadius: '4px',
+    transition: 'color 0.15s',
+  },
+  addRow: {
+    padding: '12px 16px',
+    borderTop: '1px solid #f0f0f0',
+  },
+  addBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#888',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    padding: '4px 0',
+  },
+  addForm: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    padding: '12px 16px',
+    borderTop: '1px solid #f0f0f0',
+    flexWrap: 'wrap',
+  },
+  addInput: {
+    flex: 1,
+    minWidth: '100px',
+    padding: '7px 10px',
+    fontSize: '13px',
+    border: '1.5px solid #ddd',
+    borderRadius: '6px',
+    outline: 'none',
+    color: '#111',
+  },
+  addSaveBtn: {
+    padding: '7px 16px',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: '#1a1a1a',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  addCancelBtn: {
+    padding: '7px 12px',
+    fontSize: '13px',
+    color: '#888',
+    backgroundColor: 'transparent',
+    border: '1px solid #ddd',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
