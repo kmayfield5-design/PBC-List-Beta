@@ -55,10 +55,7 @@ export default function AdvisorLoginPage() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <div style={styles.logoRow}>
-          <span style={styles.logoText}>Riveron</span>
-          <span style={styles.logoBadge}>Advisor</span>
-        </div>
+        <p style={styles.wordmark}>Riveron</p>
 
         {sent ? (
           <div>
@@ -181,49 +178,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
     padding: '24px',
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     padding: '48px 40px',
     width: '100%',
     maxWidth: '420px',
   },
-  logoRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '28px',
-  },
-  logoText: {
-    fontSize: '18px',
+  wordmark: {
+    fontSize: '15px',
     fontWeight: '700',
     letterSpacing: '-0.3px',
-    color: '#111',
-  },
-  logoBadge: {
-    fontSize: '11px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: '#888',
-    backgroundColor: '#f0f0f0',
-    padding: '2px 7px',
-    borderRadius: '99px',
+    color: '#111827',
+    margin: '0 0 28px',
   },
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: '0 0 20px',
   },
   modeToggle: {
     display: 'flex',
     borderRadius: '8px',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     overflow: 'hidden',
     marginBottom: '24px',
   },
@@ -235,16 +218,16 @@ const styles = {
     background: '#fff',
     border: 'none',
     cursor: 'pointer',
-    color: '#555',
+    color: '#6b7280',
   },
   modeBtnActive: {
-    background: '#1a1a1a',
+    background: '#0f172a',
     color: '#fff',
     fontWeight: '600',
   },
   subheading: {
     fontSize: '14px',
-    color: '#555',
+    color: '#6b7280',
     margin: '0 0 20px',
     lineHeight: '1.6',
   },
@@ -252,7 +235,7 @@ const styles = {
     display: 'block',
     fontSize: '13px',
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: '6px',
   },
   input: {
@@ -260,11 +243,11 @@ const styles = {
     width: '100%',
     padding: '10px 12px',
     fontSize: '15px',
-    border: '1.5px solid #ddd',
+    border: '1.5px solid #e5e7eb',
     borderRadius: '8px',
     outline: 'none',
     marginBottom: '16px',
-    color: '#111',
+    color: '#111827',
     backgroundColor: '#fff',
   },
   button: {
@@ -274,20 +257,20 @@ const styles = {
     fontSize: '15px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     marginBottom: '16px',
   },
   buttonDisabled: {
-    backgroundColor: '#999',
+    backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
   },
   linkButton: {
     background: 'none',
     border: 'none',
-    color: '#1a1a1a',
+    color: '#6366f1',
     fontSize: '13px',
     textDecoration: 'underline',
     cursor: 'pointer',
@@ -295,7 +278,7 @@ const styles = {
   },
   switchHint: {
     fontSize: '13px',
-    color: '#888',
+    color: '#9ca3af',
     margin: 0,
     textAlign: 'center',
   },

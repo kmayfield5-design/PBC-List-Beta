@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase.js';
+import Header from '../components/Header.jsx';
 
 function generateShareToken() {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
@@ -210,6 +211,7 @@ export default function CreateRequestPage() {
     const shareUrl = `${window.location.origin}/request/${created.shareToken}`;
     return (
       <div style={styles.page}>
+        <Header title="New Data Request" right={null} />
         <div style={styles.successCard}>
           <div style={styles.successIcon}>✓</div>
           <h1 style={styles.successHeading}>Request created</h1>
@@ -237,6 +239,7 @@ export default function CreateRequestPage() {
 
   return (
     <div style={styles.page}>
+      <Header title="New Data Request" right={null} />
       <div style={styles.container}>
 
         <div style={styles.header}>
@@ -398,12 +401,12 @@ export default function CreateRequestPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '40px 24px',
+    backgroundColor: '#f8fafc',
   },
   container: {
     maxWidth: '1000px',
     margin: '0 auto',
+    padding: '32px 24px 60px',
   },
   header: {
     marginBottom: '32px',
@@ -411,7 +414,7 @@ const styles = {
   backBtn: {
     background: 'none',
     border: 'none',
-    color: '#888',
+    color: '#9ca3af',
     fontSize: '13px',
     cursor: 'pointer',
     padding: '0 0 12px',
@@ -420,13 +423,14 @@ const styles = {
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: 0,
   },
   section: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     padding: '24px',
     marginBottom: '16px',
   },
@@ -434,17 +438,17 @@ const styles = {
     display: 'block',
     fontSize: '13px',
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: '8px',
   },
   input: {
     width: '100%',
     padding: '10px 12px',
     fontSize: '14px',
-    border: '1.5px solid #ddd',
+    border: '1.5px solid #e5e7eb',
     borderRadius: '8px',
     outline: 'none',
-    color: '#111',
+    color: '#111827',
     backgroundColor: '#fff',
   },
   sectionHeader: {
@@ -459,12 +463,12 @@ const styles = {
     display: 'block',
     fontSize: '13px',
     fontWeight: '600',
-    color: '#333',
+    color: '#111827',
     marginBottom: '2px',
   },
   sectionHint: {
     fontSize: '12px',
-    color: '#aaa',
+    color: '#9ca3af',
   },
   importExportGroup: {
     display: 'flex',
@@ -475,9 +479,9 @@ const styles = {
     padding: '6px 12px',
     fontSize: '12px',
     fontWeight: '500',
-    color: '#444',
+    color: '#6b7280',
     backgroundColor: '#fff',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
@@ -502,7 +506,7 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    color: '#aaa',
+    color: '#9ca3af',
   },
   req: {
     color: '#e74c3c',
@@ -516,10 +520,10 @@ const styles = {
   cellInput: {
     padding: '9px 10px',
     fontSize: '13px',
-    border: '1.5px solid #ddd',
+    border: '1.5px solid #e5e7eb',
     borderRadius: '7px',
     outline: 'none',
-    color: '#111',
+    color: '#111827',
     backgroundColor: '#fff',
     minWidth: 0,
   },
@@ -528,9 +532,9 @@ const styles = {
     height: '32px',
     flexShrink: 0,
     background: 'none',
-    border: '1px solid #e0e0e0',
+    border: '1px solid #e5e7eb',
     borderRadius: '6px',
-    color: '#bbb',
+    color: '#9ca3af',
     cursor: 'pointer',
     fontSize: '11px',
     display: 'flex',
@@ -540,9 +544,9 @@ const styles = {
   addItemBtn: {
     marginTop: '8px',
     background: 'none',
-    border: '1.5px dashed #ddd',
+    border: '1.5px dashed #e5e7eb',
     borderRadius: '8px',
-    color: '#888',
+    color: '#6b7280',
     fontSize: '13px',
     fontWeight: '500',
     padding: '9px 16px',
@@ -565,7 +569,7 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -574,22 +578,23 @@ const styles = {
     padding: '10px 20px',
     fontSize: '14px',
     fontWeight: '500',
-    color: '#555',
+    color: '#6b7280',
     backgroundColor: '#fff',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '8px',
     cursor: 'pointer',
   },
   btnDisabled: {
-    backgroundColor: '#999',
+    backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
   },
   successCard: {
     maxWidth: '480px',
-    margin: '80px auto 0',
+    margin: '60px auto 0',
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     padding: '48px 40px',
     textAlign: 'center',
   },
@@ -597,8 +602,8 @@ const styles = {
     width: '48px',
     height: '48px',
     borderRadius: '50%',
-    backgroundColor: '#dcfce7',
-    color: '#15803d',
+    backgroundColor: '#d1fae5',
+    color: '#059669',
     fontSize: '22px',
     display: 'flex',
     alignItems: 'center',
@@ -609,17 +614,17 @@ const styles = {
   successHeading: {
     fontSize: '20px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: '0 0 8px',
   },
   successSub: {
     fontSize: '14px',
-    color: '#555',
+    color: '#6b7280',
     lineHeight: '1.6',
     margin: '0 0 24px',
   },
   linkBox: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
     borderRadius: '8px',
     padding: '12px 16px',
     marginBottom: '20px',
@@ -629,7 +634,7 @@ const styles = {
   linkText: {
     fontSize: '13px',
     fontFamily: 'monospace',
-    color: '#333',
+    color: '#111827',
     wordBreak: 'break-all',
   },
   successActions: {

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import Header from '../components/Header.jsx';
 
 const STATUS_STYLES = {
-  active:    { label: 'Active',    bg: '#dcfce7', color: '#15803d' },
-  completed: { label: 'Completed', bg: '#dbeafe', color: '#1d4ed8' },
-  archived:  { label: 'Archived',  bg: '#f0f0f0', color: '#555' },
+  active:    { label: 'Active',    bg: '#d1fae5', color: '#059669' },
+  completed: { label: 'Completed', bg: '#dbeafe', color: '#2563eb' },
+  archived:  { label: 'Archived',  bg: '#f3f4f6', color: '#6b7280' },
 };
 
 function StatusBadge({ status }) {
@@ -145,20 +146,17 @@ export default function DashboardPage() {
   return (
     <div style={styles.page}>
       {showPasswordModal && <SetPasswordModal onClose={() => setShowPasswordModal(false)} />}
+      <Header
+        title="Data Request Dashboard"
+        right={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '13px', color: '#94a3b8' }}>{user?.email}</span>
+            <button style={styles.headerBtn} onClick={() => setShowPasswordModal(true)}>Set password</button>
+            <button style={styles.headerBtn} onClick={handleSignOut}>Sign out</button>
+          </div>
+        }
+      />
       <div style={styles.container}>
-
-        {/* Header */}
-        <div style={styles.header}>
-          <div>
-            <span style={styles.logoText}>Riveron</span>
-            <span style={styles.logoBadge}>Advisor</span>
-          </div>
-          <div style={styles.headerRight}>
-            <span style={styles.userEmail}>{user?.email}</span>
-            <button style={styles.signOutBtn} onClick={() => setShowPasswordModal(true)}>Set password</button>
-            <button style={styles.signOutBtn} onClick={handleSignOut}>Sign out</button>
-          </div>
-        </div>
 
         {/* Toolbar */}
         <div style={styles.toolbar}>
@@ -251,52 +249,18 @@ export default function DashboardPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    fontFamily: 'sans-serif',
+    backgroundColor: '#f8fafc',
   },
   container: {
     maxWidth: '1000px',
     margin: '0 auto',
-    padding: '0 24px 60px',
+    padding: '32px 24px 60px',
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px 0',
-    borderBottom: '1px solid #e8e8e8',
-    marginBottom: '32px',
-  },
-  logoText: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#111',
-    marginRight: '8px',
-  },
-  logoBadge: {
-    fontSize: '11px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: '#888',
-    backgroundColor: '#f0f0f0',
-    padding: '2px 7px',
-    borderRadius: '99px',
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  userEmail: {
+  headerBtn: {
     fontSize: '13px',
-    color: '#888',
-  },
-  signOutBtn: {
-    fontSize: '13px',
-    color: '#555',
+    color: '#cbd5e1',
     background: 'none',
-    border: '1px solid #ddd',
+    border: '1px solid #334155',
     borderRadius: '6px',
     padding: '5px 12px',
     cursor: 'pointer',
@@ -312,7 +276,7 @@ const styles = {
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: 0,
   },
   toolbarRight: {
@@ -324,7 +288,7 @@ const styles = {
     display: 'flex',
     borderRadius: '8px',
     overflow: 'hidden',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
   },
   filterBtn: {
     padding: '7px 14px',
@@ -333,10 +297,10 @@ const styles = {
     background: '#fff',
     border: 'none',
     cursor: 'pointer',
-    color: '#555',
+    color: '#6b7280',
   },
   filterBtnActive: {
-    background: '#1a1a1a',
+    background: '#0f172a',
     color: '#fff',
   },
   newBtn: {
@@ -344,15 +308,16 @@ const styles = {
     fontSize: '13px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
   },
   tableWrapper: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -365,19 +330,19 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#888',
+    color: '#9ca3af',
     textAlign: 'left',
-    borderBottom: '1px solid #f0f0f0',
-    backgroundColor: '#fafafa',
+    borderBottom: '1px solid #e5e7eb',
+    backgroundColor: '#f8fafc',
   },
   tr: {
-    borderBottom: '1px solid #f5f5f5',
+    borderBottom: '1px solid #f3f4f6',
     cursor: 'pointer',
   },
   td: {
     padding: '14px 16px',
     fontSize: '14px',
-    color: '#222',
+    color: '#111827',
     verticalAlign: 'middle',
   },
   projectName: {
@@ -393,34 +358,34 @@ const styles = {
   progressTrack: {
     width: '80px',
     height: '6px',
-    backgroundColor: '#e8e8e8',
+    backgroundColor: '#e5e7eb',
     borderRadius: '99px',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   progressLabel: {
     fontSize: '12px',
-    color: '#888',
+    color: '#9ca3af',
     whiteSpace: 'nowrap',
   },
   copyBtn: {
     fontSize: '12px',
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#111827',
     background: 'none',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '6px',
     padding: '4px 10px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
   viewArrow: {
-    color: '#bbb',
+    color: '#9ca3af',
     fontSize: '16px',
   },
   emptyState: {
@@ -428,7 +393,7 @@ const styles = {
     padding: '60px 0',
   },
   muted: {
-    color: '#888',
+    color: '#9ca3af',
     marginBottom: '16px',
   },
   errorText: {
@@ -443,26 +408,27 @@ const modal = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
   },
   card: {
-    backgroundColor: '#fff', borderRadius: '12px', padding: '36px',
-    width: '100%', maxWidth: '400px', boxShadow: '0 8px 40px rgba(0,0,0,0.16)',
+    backgroundColor: '#fff', borderRadius: '11px', padding: '36px',
+    width: '100%', maxWidth: '400px', border: '1px solid #e5e7eb',
+    boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
   },
-  heading: { fontSize: '18px', fontWeight: '700', color: '#111', margin: '0 0 8px' },
-  sub: { fontSize: '14px', color: '#555', lineHeight: '1.6', margin: '0 0 20px' },
-  label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px' },
+  heading: { fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 8px' },
+  sub: { fontSize: '14px', color: '#6b7280', lineHeight: '1.6', margin: '0 0 20px' },
+  label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#111827', marginBottom: '6px' },
   input: {
     display: 'block', width: '100%', padding: '10px 12px', fontSize: '14px',
-    border: '1.5px solid #ddd', borderRadius: '8px', outline: 'none',
-    marginBottom: '14px', color: '#111', backgroundColor: '#fff',
+    border: '1.5px solid #e5e7eb', borderRadius: '8px', outline: 'none',
+    marginBottom: '14px', color: '#111827', backgroundColor: '#fff',
   },
   error: { fontSize: '13px', color: '#c0392b', margin: '-6px 0 12px' },
   actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' },
   btn: {
     padding: '9px 20px', fontSize: '14px', fontWeight: '600', color: '#fff',
-    backgroundColor: '#1a1a1a', border: 'none', borderRadius: '8px', cursor: 'pointer',
+    backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', cursor: 'pointer',
   },
-  btnDisabled: { backgroundColor: '#999', cursor: 'not-allowed' },
+  btnDisabled: { backgroundColor: '#9ca3af', cursor: 'not-allowed' },
   ghostBtn: {
-    padding: '9px 16px', fontSize: '14px', color: '#555', backgroundColor: '#fff',
-    border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer',
+    padding: '9px 16px', fontSize: '14px', color: '#6b7280', backgroundColor: '#fff',
+    border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer',
   },
 };

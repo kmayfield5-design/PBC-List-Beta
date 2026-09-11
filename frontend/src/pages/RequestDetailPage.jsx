@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import Header from '../components/Header.jsx';
 
 const STORAGE_BUCKET = 'pbc-uploads';
 
 const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'complete'];
 
 const STATUS_STYLES = {
-  pending:  { bg: '#f0f0f0', color: '#555' },
-  uploaded: { bg: '#dbeafe', color: '#1d4ed8' },
-  reviewed: { bg: '#fef9c3', color: '#a16207' },
-  complete: { bg: '#dcfce7', color: '#15803d' },
+  pending:  { bg: '#f3f4f6', color: '#6b7280' },
+  uploaded: { bg: '#dbeafe', color: '#2563eb' },
+  reviewed: { bg: '#fef3c7', color: '#d97706' },
+  complete: { bg: '#d1fae5', color: '#059669' },
 };
 
 const REQUEST_STATUS_OPTIONS = ['active', 'completed', 'archived'];
 const REQUEST_STATUS_STYLES = {
-  active:    { bg: '#dcfce7', color: '#15803d' },
-  completed: { bg: '#dbeafe', color: '#1d4ed8' },
-  archived:  { bg: '#f0f0f0', color: '#555' },
+  active:    { bg: '#d1fae5', color: '#059669' },
+  completed: { bg: '#dbeafe', color: '#2563eb' },
+  archived:  { bg: '#f3f4f6', color: '#6b7280' },
 };
 
 function formatDate(dateStr) {
@@ -285,6 +286,32 @@ export default function RequestDetailPage() {
 
   return (
     <div style={styles.page}>
+      <Header
+        title={request?.project_name ?? 'Request Detail'}
+        right={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <select
+              value={request.status}
+              onChange={(e) => handleRequestStatusChange(e.target.value)}
+              disabled={requestStatusUpdating}
+              style={{
+                ...styles.statusSelect,
+                backgroundColor: reqStatus.bg,
+                color: reqStatus.color,
+              }}
+            >
+              {REQUEST_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </select>
+            <button style={styles.copyBtn} onClick={copyShareLink}>
+              {copiedLink ? 'Copied!' : 'Copy share link'}
+            </button>
+          </div>
+        }
+      />
       <div style={styles.container}>
 
         {/* Back */}
@@ -299,28 +326,6 @@ export default function RequestDetailPage() {
               <p style={styles.eyebrow}>Data request</p>
               <h1 style={styles.heading}>{request.project_name}</h1>
               <p style={styles.meta}>Created {formatDate(request.created_at)}</p>
-            </div>
-            <div style={styles.headerActions}>
-              {/* Request status selector */}
-              <select
-                value={request.status}
-                onChange={(e) => handleRequestStatusChange(e.target.value)}
-                disabled={requestStatusUpdating}
-                style={{
-                  ...styles.statusSelect,
-                  backgroundColor: reqStatus.bg,
-                  color: reqStatus.color,
-                }}
-              >
-                {REQUEST_STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <button style={styles.copyBtn} onClick={copyShareLink}>
-                {copiedLink ? 'Copied!' : 'Copy share link'}
-              </button>
             </div>
           </div>
 
@@ -568,25 +573,24 @@ export default function RequestDetailPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '32px 24px 60px',
+    backgroundColor: '#f8fafc',
   },
   container: {
     maxWidth: '1050px',
     margin: '0 auto',
+    padding: '24px 24px 60px',
   },
   center: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: 'sans-serif',
-    color: '#888',
+    color: '#9ca3af',
   },
   backBtn: {
     background: 'none',
     border: 'none',
-    color: '#888',
+    color: '#9ca3af',
     fontSize: '13px',
     cursor: 'pointer',
     padding: '0 0 16px',
@@ -594,8 +598,9 @@ const styles = {
   },
   headerCard: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     padding: '28px',
     marginBottom: '16px',
   },
@@ -612,25 +617,19 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: '#aaa',
+    color: '#9ca3af',
     margin: '0 0 4px',
   },
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: '0 0 4px',
   },
   meta: {
     fontSize: '13px',
-    color: '#aaa',
+    color: '#9ca3af',
     margin: 0,
-  },
-  headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flexWrap: 'wrap',
   },
   statusSelect: {
     padding: '6px 10px',
@@ -645,9 +644,9 @@ const styles = {
     padding: '7px 14px',
     fontSize: '13px',
     fontWeight: '500',
-    color: '#333',
+    color: '#111827',
     backgroundColor: '#fff',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '8px',
     cursor: 'pointer',
   },
@@ -659,26 +658,27 @@ const styles = {
   progressTrack: {
     flex: 1,
     height: '6px',
-    backgroundColor: '#e8e8e8',
+    backgroundColor: '#e5e7eb',
     borderRadius: '99px',
     overflow: 'hidden',
     maxWidth: '320px',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   progressLabel: {
     fontSize: '13px',
-    color: '#888',
+    color: '#9ca3af',
     whiteSpace: 'nowrap',
   },
   tableCard: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -691,10 +691,10 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#aaa',
+    color: '#9ca3af',
     textAlign: 'left',
-    borderBottom: '1px solid #f0f0f0',
-    backgroundColor: '#fafafa',
+    borderBottom: '1px solid #e5e7eb',
+    backgroundColor: '#f8fafc',
     whiteSpace: 'nowrap',
   },
   areaHeader: {
@@ -703,18 +703,18 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.07em',
-    color: '#888',
-    backgroundColor: '#f7f7f7',
-    borderTop: '1px solid #efefef',
-    borderBottom: '1px solid #efefef',
+    color: '#6b7280',
+    backgroundColor: '#f8fafc',
+    borderTop: '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
   },
   tr: {
-    borderBottom: '1px solid #f5f5f5',
+    borderBottom: '1px solid #f3f4f6',
   },
   td: {
     padding: '13px 16px',
     fontSize: '14px',
-    color: '#222',
+    color: '#111827',
     verticalAlign: 'top',
   },
   itemName: {
@@ -724,12 +724,12 @@ const styles = {
   notes: {
     display: 'block',
     fontSize: '12px',
-    color: '#aaa',
+    color: '#9ca3af',
     marginTop: '2px',
   },
   contactEmail: {
     fontSize: '13px',
-    color: '#555',
+    color: '#6b7280',
   },
   overdueTag: {
     display: 'inline-block',
@@ -755,7 +755,7 @@ const styles = {
     padding: '4px 10px',
     fontSize: '12px',
     fontWeight: '500',
-    color: '#1d4ed8',
+    color: '#2563eb',
     backgroundColor: '#dbeafe',
     border: 'none',
     borderRadius: '6px',
@@ -765,7 +765,7 @@ const styles = {
   deleteBtn: {
     background: 'none',
     border: 'none',
-    color: '#bbb',
+    color: '#9ca3af',
     fontSize: '18px',
     lineHeight: 1,
     cursor: 'pointer',
@@ -775,7 +775,7 @@ const styles = {
   editIconBtn: {
     background: 'none',
     border: 'none',
-    color: '#bbb',
+    color: '#9ca3af',
     fontSize: '15px',
     lineHeight: 1,
     cursor: 'pointer',
@@ -788,10 +788,10 @@ const styles = {
     width: '100%',
     padding: '5px 8px',
     fontSize: '13px',
-    border: '1.5px solid #ddd',
+    border: '1.5px solid #e5e7eb',
     borderRadius: '6px',
     outline: 'none',
-    color: '#111',
+    color: '#111827',
     backgroundColor: '#fff',
   },
   editSaveBtn: {
@@ -799,7 +799,7 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -808,20 +808,20 @@ const styles = {
   editCancelBtn: {
     padding: '5px 10px',
     fontSize: '12px',
-    color: '#888',
+    color: '#6b7280',
     backgroundColor: 'transparent',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '6px',
     cursor: 'pointer',
   },
   addRow: {
     padding: '12px 16px',
-    borderTop: '1px solid #f0f0f0',
+    borderTop: '1px solid #e5e7eb',
   },
   addBtn: {
     background: 'none',
     border: 'none',
-    color: '#888',
+    color: '#6b7280',
     fontSize: '13px',
     fontWeight: '600',
     cursor: 'pointer',
@@ -832,7 +832,7 @@ const styles = {
     gap: '8px',
     alignItems: 'center',
     padding: '12px 16px',
-    borderTop: '1px solid #f0f0f0',
+    borderTop: '1px solid #e5e7eb',
     flexWrap: 'wrap',
   },
   addInput: {
@@ -840,17 +840,17 @@ const styles = {
     minWidth: '100px',
     padding: '7px 10px',
     fontSize: '13px',
-    border: '1.5px solid #ddd',
+    border: '1.5px solid #e5e7eb',
     borderRadius: '6px',
     outline: 'none',
-    color: '#111',
+    color: '#111827',
   },
   addSaveBtn: {
     padding: '7px 16px',
     fontSize: '13px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -859,9 +859,9 @@ const styles = {
   addCancelBtn: {
     padding: '7px 12px',
     fontSize: '13px',
-    color: '#888',
+    color: '#6b7280',
     backgroundColor: 'transparent',
-    border: '1px solid #ddd',
+    border: '1px solid #e5e7eb',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',

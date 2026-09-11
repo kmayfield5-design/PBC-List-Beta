@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import Header from '../components/Header.jsx';
 
 const STORAGE_BUCKET = 'pbc-uploads';
 
 const STATUS_STYLES = {
-  pending:  { label: 'Pending',  bg: '#f0f0f0', color: '#555' },
-  uploaded: { label: 'Uploaded', bg: '#dbeafe', color: '#1d4ed8' },
-  reviewed: { label: 'Reviewed', bg: '#fef9c3', color: '#a16207' },
-  complete: { label: 'Complete', bg: '#dcfce7', color: '#15803d' },
+  pending:  { label: 'Pending',  bg: '#f3f4f6', color: '#6b7280' },
+  uploaded: { label: 'Uploaded', bg: '#dbeafe', color: '#2563eb' },
+  reviewed: { label: 'Reviewed', bg: '#fef3c7', color: '#d97706' },
+  complete: { label: 'Complete', bg: '#d1fae5', color: '#059669' },
 };
 
 function StatusBadge({ status }) {
@@ -164,6 +165,7 @@ export default function UploadPage() {
 
   return (
     <div style={styles.page}>
+      <Header />
       <div style={styles.container}>
 
         {/* Header */}
@@ -283,11 +285,7 @@ export default function UploadPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '40px 24px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
+    backgroundColor: '#f8fafc',
   },
   center: {
     minHeight: '100vh',
@@ -298,6 +296,8 @@ const styles = {
   container: {
     width: '100%',
     maxWidth: '900px',
+    margin: '0 auto',
+    padding: '32px 24px 60px',
   },
   header: {
     display: 'flex',
@@ -312,13 +312,13 @@ const styles = {
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: '#888',
+    color: '#9ca3af',
     margin: '0 0 4px',
   },
   heading: {
     fontSize: '24px',
     fontWeight: '700',
-    color: '#111',
+    color: '#111827',
     margin: 0,
   },
   progress: {
@@ -326,27 +326,28 @@ const styles = {
   },
   progressLabel: {
     fontSize: '13px',
-    color: '#555',
+    color: '#6b7280',
     display: 'block',
     marginBottom: '6px',
   },
   progressTrack: {
     width: '160px',
     height: '6px',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#e5e7eb',
     borderRadius: '99px',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   tableWrapper: {
     backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+    borderRadius: '11px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -359,18 +360,18 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#888',
+    color: '#9ca3af',
     textAlign: 'left',
-    borderBottom: '1px solid #f0f0f0',
-    backgroundColor: '#fafafa',
+    borderBottom: '1px solid #e5e7eb',
+    backgroundColor: '#f8fafc',
   },
   tr: {
-    borderBottom: '1px solid #f5f5f5',
+    borderBottom: '1px solid #f3f4f6',
   },
   td: {
     padding: '14px 16px',
     fontSize: '14px',
-    color: '#222',
+    color: '#111827',
     verticalAlign: 'top',
   },
   itemName: {
@@ -380,7 +381,7 @@ const styles = {
   notes: {
     display: 'block',
     fontSize: '12px',
-    color: '#888',
+    color: '#9ca3af',
     marginTop: '2px',
   },
   overdueTag: {
@@ -403,7 +404,7 @@ const styles = {
   },
   fileName: {
     fontSize: '13px',
-    color: '#555',
+    color: '#6b7280',
     fontFamily: 'monospace',
   },
   uploadBtn: {
@@ -411,14 +412,14 @@ const styles = {
     fontSize: '13px',
     fontWeight: '600',
     color: '#fff',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0f172a',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
   uploadBtnDisabled: {
-    backgroundColor: '#999',
+    backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
   },
   areaHeader: {
@@ -427,10 +428,10 @@ const styles = {
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: '0.07em',
-    color: '#888',
-    backgroundColor: '#f7f7f7',
-    borderTop: '1px solid #efefef',
-    borderBottom: '1px solid #efefef',
+    color: '#6b7280',
+    backgroundColor: '#f8fafc',
+    borderTop: '1px solid #e5e7eb',
+    borderBottom: '1px solid #e5e7eb',
   },
   youBadge: {
     display: 'inline-block',
@@ -438,7 +439,7 @@ const styles = {
     fontSize: '10px',
     fontWeight: '700',
     textTransform: 'uppercase',
-    color: '#1d4ed8',
+    color: '#2563eb',
     backgroundColor: '#dbeafe',
     padding: '1px 5px',
     borderRadius: '4px',
