@@ -36,6 +36,56 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function SetPasswordModal({ onClose }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  async function handleSetPassword(e) {
+    e.preventDefault();
+    setError('');
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (password !== confirm) { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) { setError(error.message); } else { setSuccess(true); }
+    setLoading(false);
+  }
+
+  return (
+    <div style={modal.overlay} onClick={onClose}>
+      <div style={modal.card} onClick={(e) => e.stopPropagation()}>
+        <h2 style={modal.heading}>{success ? 'Password set' : 'Set a password'}</h2>
+        {success ? (
+          <>
+            <p style={modal.sub}>You can now sign in with your email and password.</p>
+            <button style={modal.btn} onClick={onClose}>Done</button>
+          </>
+        ) : (
+          <form onSubmit={handleSetPassword} noValidate>
+            <p style={modal.sub}>Once set, you can sign in with your password instead of email links.</p>
+            <label style={modal.label}>New password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min. 8 characters" style={modal.input} disabled={loading} autoFocus />
+            <label style={modal.label}>Confirm password</label>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Re-enter password" style={modal.input} disabled={loading} />
+            {error && <p style={modal.error}>{error}</p>}
+            <div style={modal.actions}>
+              <button type="button" style={modal.ghostBtn} onClick={onClose} disabled={loading}>Cancel</button>
+              <button type="submit" style={{ ...modal.btn, ...(loading ? modal.btnDisabled : {}) }} disabled={loading}>
+                {loading ? 'Saving…' : 'Set password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -44,6 +94,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('mine'); // 'mine' | 'all'
   const [copiedId, setCopiedId] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -93,6 +144,7 @@ export default function DashboardPage() {
 
   return (
     <div style={styles.page}>
+      {showPasswordModal && <SetPasswordModal onClose={() => setShowPasswordModal(false)} />}
       <div style={styles.container}>
 
         {/* Header */}
@@ -103,6 +155,7 @@ export default function DashboardPage() {
           </div>
           <div style={styles.headerRight}>
             <span style={styles.userEmail}>{user?.email}</span>
+            <button style={styles.signOutBtn} onClick={() => setShowPasswordModal(true)}>Set password</button>
             <button style={styles.signOutBtn} onClick={handleSignOut}>Sign out</button>
           </div>
         </div>
@@ -381,5 +434,35 @@ const styles = {
   errorText: {
     color: '#c0392b',
     fontSize: '14px',
+  },
+};
+
+const modal = {
+  overlay: {
+    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+  },
+  card: {
+    backgroundColor: '#fff', borderRadius: '12px', padding: '36px',
+    width: '100%', maxWidth: '400px', boxShadow: '0 8px 40px rgba(0,0,0,0.16)',
+  },
+  heading: { fontSize: '18px', fontWeight: '700', color: '#111', margin: '0 0 8px' },
+  sub: { fontSize: '14px', color: '#555', lineHeight: '1.6', margin: '0 0 20px' },
+  label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px' },
+  input: {
+    display: 'block', width: '100%', padding: '10px 12px', fontSize: '14px',
+    border: '1.5px solid #ddd', borderRadius: '8px', outline: 'none',
+    marginBottom: '14px', color: '#111', backgroundColor: '#fff',
+  },
+  error: { fontSize: '13px', color: '#c0392b', margin: '-6px 0 12px' },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' },
+  btn: {
+    padding: '9px 20px', fontSize: '14px', fontWeight: '600', color: '#fff',
+    backgroundColor: '#1a1a1a', border: 'none', borderRadius: '8px', cursor: 'pointer',
+  },
+  btnDisabled: { backgroundColor: '#999', cursor: 'not-allowed' },
+  ghostBtn: {
+    padding: '9px 16px', fontSize: '14px', color: '#555', backgroundColor: '#fff',
+    border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer',
   },
 };

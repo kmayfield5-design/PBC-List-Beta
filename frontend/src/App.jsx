@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import AdvisorLoginPage from './pages/AdvisorLoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import CreateRequestPage from './pages/CreateRequestPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -37,7 +38,7 @@ export default function App() {
         />
         <Route
           path="/dashboard/new"
-          element={<ProtectedRoute><div style={{ padding: 40, fontFamily: 'sans-serif' }}>Create request — coming soon.</div></ProtectedRoute>}
+          element={<ProtectedRoute><CreateRequestPage /></ProtectedRoute>}
         />
         <Route
           path="/dashboard/:requestId"
