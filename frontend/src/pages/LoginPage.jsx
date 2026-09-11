@@ -67,6 +67,7 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
       }
 
       localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('share_token', shareToken);
       onLoginSuccess(data.token, data.redirectTo);
     } catch {
       setError('Unable to reach the server. Check your connection and try again.');
