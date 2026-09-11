@@ -59,6 +59,9 @@ export default function RequestDetailPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
   const [addLoading, setAddLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
 
   // ─── Fetch ────────────────────────────────────────────────
 
@@ -156,6 +159,45 @@ export default function RequestDetailPage() {
     }
 
     setDownloadingId(null);
+  }
+
+  // ─── Edit item ───────────────────────────────────
+
+  function handleEditStart(item) {
+    setEditingId(item.id);
+    setEditForm({
+      area: item.area || '',
+      item_name: item.item_name || '',
+      contact_email: item.contact_email || '',
+      owner: item.owner || '',
+      deadline: item.deadline || '',
+    });
+  }
+
+  async function handleEditSave(itemId) {
+    setEditLoading(true);
+
+    const { data: updated, error } = await supabase
+      .from('request_items')
+      .update({
+        area: editForm.area.trim() || null,
+        item_name: editForm.item_name.trim(),
+        contact_email: editForm.contact_email.trim().toLowerCase(),
+        owner: editForm.owner.trim() || null,
+        deadline: editForm.deadline || null,
+      })
+      .eq('id', itemId)
+      .select('id, area, item_name, contact_email, deadline, owner, status, file_path, uploaded_at, notes')
+      .single();
+
+    if (!error && updated) {
+      setItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
+      setEditingId(null);
+    } else {
+      console.error('Edit save failed:', error?.message);
+    }
+
+    setEditLoading(false);
   }
 
   // ─── Delete item ─────────────────────────────────
@@ -318,8 +360,74 @@ export default function RequestDetailPage() {
                     </tr>
 
                     {areaItems.map((item) => {
+                      const isEditing = editingId === item.id;
                       const overdue = isOverdue(item.deadline, item.status);
                       const s = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
+
+                      if (isEditing) {
+                        return (
+                          <tr key={item.id} style={{ ...styles.tr, backgroundColor: '#fafafa' }}>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.editInput}
+                                placeholder="Item name"
+                                value={editForm.item_name}
+                                onChange={(e) => setEditForm((f) => ({ ...f, item_name: e.target.value }))}
+                              />
+                              <input
+                                style={{ ...styles.editInput, marginTop: '4px', fontSize: '12px' }}
+                                placeholder="Area"
+                                value={editForm.area}
+                                onChange={(e) => setEditForm((f) => ({ ...f, area: e.target.value }))}
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.editInput}
+                                placeholder="Contact email"
+                                type="email"
+                                value={editForm.contact_email}
+                                onChange={(e) => setEditForm((f) => ({ ...f, contact_email: e.target.value }))}
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.editInput}
+                                placeholder="Owner"
+                                value={editForm.owner}
+                                onChange={(e) => setEditForm((f) => ({ ...f, owner: e.target.value }))}
+                              />
+                            </td>
+                            <td style={styles.td}>
+                              <input
+                                style={styles.editInput}
+                                type="date"
+                                value={editForm.deadline}
+                                onChange={(e) => setEditForm((f) => ({ ...f, deadline: e.target.value }))}
+                              />
+                            </td>
+                            <td style={styles.td} colSpan={3}>
+                              <span style={{ fontSize: '12px', color: '#aaa' }}>Status & file unchanged</span>
+                            </td>
+                            <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
+                              <button
+                                style={styles.editSaveBtn}
+                                onClick={() => handleEditSave(item.id)}
+                                disabled={editLoading}
+                              >
+                                {editLoading ? '…' : 'Save'}
+                              </button>
+                              <button
+                                style={styles.editCancelBtn}
+                                onClick={() => setEditingId(null)}
+                                disabled={editLoading}
+                              >
+                                Cancel
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
 
                       return (
                         <tr key={item.id} style={styles.tr}>
@@ -369,7 +477,14 @@ export default function RequestDetailPage() {
                           <td style={{ ...styles.td, fontSize: '12px', color: '#888' }}>
                             {item.uploaded_at ? formatDate(item.uploaded_at) : '—'}
                           </td>
-                          <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px' }}>
+                          <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
+                            <button
+                              style={styles.editIconBtn}
+                              onClick={() => handleEditStart(item)}
+                              title="Edit item"
+                            >
+                              ✎
+                            </button>
                             <button
                               style={styles.deleteBtn}
                               onClick={() => handleDeleteItem(item.id)}
@@ -656,7 +771,48 @@ const styles = {
     cursor: 'pointer',
     padding: '0 4px',
     borderRadius: '4px',
-    transition: 'color 0.15s',
+  },
+  editIconBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#bbb',
+    fontSize: '15px',
+    lineHeight: 1,
+    cursor: 'pointer',
+    padding: '0 4px',
+    borderRadius: '4px',
+    marginRight: '2px',
+  },
+  editInput: {
+    display: 'block',
+    width: '100%',
+    padding: '5px 8px',
+    fontSize: '13px',
+    border: '1.5px solid #ddd',
+    borderRadius: '6px',
+    outline: 'none',
+    color: '#111',
+    backgroundColor: '#fff',
+  },
+  editSaveBtn: {
+    padding: '5px 12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: '#1a1a1a',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    marginRight: '6px',
+  },
+  editCancelBtn: {
+    padding: '5px 10px',
+    fontSize: '12px',
+    color: '#888',
+    backgroundColor: 'transparent',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
   addRow: {
     padding: '12px 16px',
