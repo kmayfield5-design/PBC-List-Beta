@@ -51,6 +51,13 @@ export type RequestLifecycleStatus = 'active' | 'completed' | 'archived';
 
 // ─── Tables ──────────────────────────────────────────────────
 
+/** Shape of the per-engagement vocabulary stored in requests.metadata. */
+export interface RequestVocabulary {
+  areas: Array<{ value: string; label: string }>;
+  workstreams: Array<{ value: string; label: string }>;
+  defaults: { expected_format?: string };
+}
+
 /** Row type for the `requests` table. */
 export interface Request {
   id: string;
@@ -61,6 +68,12 @@ export interface Request {
   /** ISO timestamp string. Note: stored as TIMESTAMP (no tz) in DB. */
   created_at: string | null;
   status: RequestLifecycleStatus | null;
+  /**
+   * Per-engagement vocabulary: areas, workstreams, and item defaults.
+   * Added in migration 20260911000002. Defaults to the standard IPO
+   * readiness vocabulary if not explicitly set.
+   */
+  metadata: RequestVocabulary;
 }
 
 /**

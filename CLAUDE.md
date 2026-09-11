@@ -74,11 +74,17 @@ Advisor flows (dashboard, request detail, create request) call Supabase directly
 the frontend using the Supabase anon key and RLS policies. Mutations are not routed
 through the Express backend.
 
-The Express backend (`/api/requests/:id/items`, `/api/requests/:id/items/:id/upload`)
-is a separate data-access path that uses the **service role key** and validates the
-caller's custom JWT on every request. File uploads through the backend write to
-`audit_log`; file uploads through the frontend (UploadPage) call Supabase Storage
-directly and do not.
+The Express backend has two route groups with different auth:
+
+**Client routes** — validated by `verifyJWT` (custom JWT signed with `JWT_SECRET`):
+- `GET /api/requests/:requestId/items` — returns items for the client's email
+- `POST /api/requests/:requestId/items/:itemId/upload` — file upload
+
+**Advisor routes** — validated by `verifyAdvisorJWT` (calls `supabase.auth.getUser()`):
+- `GET /api/requests/:requestId` — project + vocabulary for the advisor dashboard
+- `POST /api/requests/:requestId/items` — creates an item, generating a ref_code
+
+All backend mutations write to `audit_log`; Supabase-direct frontend mutations do not.
 
 ### audit_log coverage
 
@@ -102,7 +108,21 @@ Four tables:
 
 **Status enums (enforced by CHECK constraints):**
 - `requests.status`: `active`, `completed`, `archived`
-- `request_items.status`: `pending`, `uploaded`, `reviewed`, `complete`
+- `request_items.status`: `pending`, `uploaded`, `reviewed`, `needs_revision`, `complete`, `not_applicable` (widened in migration 20260911000001)
+
+**`requests.metadata` (added in migration 20260911000002):**
+JSONB column storing per-engagement vocabulary. Shape:
+```json
+{
+  "areas":       [{"value": "finance", "label": "Finance"}, ...],
+  "workstreams": [{"value": "asc_606", "label": "ASC 606"}, ...],
+  "defaults":    {"expected_format": "xlsx"}
+}
+```
+Default vocabulary (7 IPO readiness areas, no workstreams) is applied via SQL column
+DEFAULT so every request created — even from the frontend — gets a vocabulary
+automatically. The advisor backend route `GET /api/requests/:id` returns it as
+`vocabulary` so the frontend can render dropdowns from config.
 
 Row-level security is enabled on `requests` and `request_items`. Advisors (Supabase
 `authenticated` role) can read all rows; inserts are gated to the authenticated user's
@@ -149,11 +169,17 @@ PBC-List-Beta/
     package.json
     config/
       supabase.js             # Supabase client with SERVICE ROLE key (server-side only)
+    lib/
+      refCode.js              # generateRefCode + insertItemWithRefCode (concurrent-safe)
+      vocabulary.js           # DEFAULT_VOCABULARY constant (mirrors the SQL column default)
     middleware/
-      auth.js                 # verifyJWT: validates Bearer token, attaches req.user
+      auth.js                 # verifyJWT: validates custom client JWT
+      advisorAuth.js          # verifyAdvisorJWT: validates Supabase Auth token via getUser()
     routes/
       auth.js                 # POST /api/auth/request-otp, POST /api/auth/verify-otp
-      requests.js             # GET /items, POST /items/:id/upload (all JWT-gated)
+      requests.js             # Advisor: GET /:id, POST /:id/items — Client: GET /:id/items, POST /:id/items/:id/upload
+    __tests__/
+      refCode.test.js         # Jest unit tests including concurrent-insert case
   db/
     schema.sql                # Canonical Postgres schema: tables, RLS, indexes
   riveron_tracker_complete_flow.svg   # Architecture diagram (not served in the app)
@@ -304,6 +330,18 @@ development, run both and call `http://localhost:3001` directly.
 
 ## Testing
 
-There are no tests. Before adding tests, agree on a framework and runner for each
-layer (Jest or Vitest for frontend unit/component tests; Supertest + Jest for backend
-route tests) and document the choice here.
+### Backend
+
+Jest (`jest@^29`) is installed as a dev dependency. Run with `npm test` from `backend/`.
+Test files live in `backend/__tests__/`. Jest is configured via its defaults (no config
+file); it picks up any file matching `**/__tests__/**/*.js` or `**/*.test.js`.
+
+Current coverage:
+- `backend/__tests__/refCode.test.js` — unit tests for `generateRefCode` and
+  `insertItemWithRefCode`, including prefix mapping, zero-padding, count-based sequencing,
+  and the concurrent-insert retry scenario (23505 unique violation).
+
+### Frontend
+
+No frontend tests exist. If added, use Vitest (it integrates with Vite without extra
+configuration). Document the choice here when it's made.
