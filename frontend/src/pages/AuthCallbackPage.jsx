@@ -33,6 +33,8 @@ export default function AuthCallbackPage() {
     setStatus('Verifying your access…');
 
     const email = session.user.email?.toLowerCase();
+    console.log('[AuthCallback] session email:', email);
+    console.log('[AuthCallback] share_token from URL:', shareToken);
 
     if (!shareToken) {
       setStatus('Invalid link — missing request token.');
@@ -46,6 +48,8 @@ export default function AuthCallbackPage() {
       .eq('share_token', shareToken)
       .maybeSingle();
 
+    console.log('[AuthCallback] request lookup:', { request, reqErr });
+
     if (reqErr || !request) {
       await supabase.auth.signOut();
       redirectToLogin('This share link is invalid or has expired.');
@@ -53,12 +57,17 @@ export default function AuthCallbackPage() {
     }
 
     // 2. Check email is authorized for this request
-    const { data: item, error: itemErr } = await supabase
+    const { data: allItems, error: itemErr } = await supabase
       .from('request_items')
-      .select('id')
-      .eq('request_id', request.id)
-      .eq('contact_email', email)
-      .maybeSingle();
+      .select('id, contact_email')
+      .eq('request_id', request.id);
+
+    console.log('[AuthCallback] all items for request:', { allItems, itemErr });
+    console.log('[AuthCallback] looking for email:', email);
+
+    const item = allItems?.find(
+      (i) => i.contact_email?.toLowerCase() === email
+    );
 
     if (itemErr || !item) {
       await supabase.auth.signOut();
