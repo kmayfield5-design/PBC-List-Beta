@@ -1,26 +1,23 @@
-import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useSearchParams } from 'react-router-dom';
 import AdvisorLoginPage from './pages/AdvisorLoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import CreateRequestPage from './pages/CreateRequestPage.jsx';
 import RequestDetailPage from './pages/RequestDetailPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
+import AuthCallbackPage from './pages/AuthCallbackPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function ClientLoginRoute() {
   const { shareToken } = useParams();
-  const navigate = useNavigate();
-  return (
-    <LoginPage
-      shareToken={shareToken}
-      onLoginSuccess={(_token, redirectTo) => navigate(redirectTo)}
-    />
-  );
+  const [searchParams] = useSearchParams();
+  const errorMsg = searchParams.get('error');
+  return <LoginPage shareToken={shareToken} errorMessage={errorMsg} />;
 }
 
 function NotFound() {
   return (
-    <div style={{ textAlign: 'center', padding: '80px 24px', fontFamily: 'sans-serif' }}>
+    <div style={{ textAlign: 'center', padding: '80px 24px' }}>
       <h2 style={{ color: '#111' }}>Page not found</h2>
       <p style={{ color: '#555' }}>This link may be invalid or expired.</p>
     </div>
@@ -48,6 +45,7 @@ export default function App() {
 
         {/* Client routes */}
         <Route path="/request/:shareToken" element={<ClientLoginRoute />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/upload/:requestId" element={<UploadPage />} />
 
         {/* Catch-all */}

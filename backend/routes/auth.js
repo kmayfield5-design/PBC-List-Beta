@@ -89,7 +89,7 @@ router.post('/request-otp', async (req, res) => {
 
   // 5. Send OTP email via Resend
   const { error: emailError } = await resend.emails.send({
-    from: 'noreply@riveron.dev',
+    from: 'noreply@riveron.app',
     to: email,
     subject: 'Your Riveron data request code',
     html: `

@@ -1,94 +1,33 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
-export default function LoginPage({ shareToken, onLoginSuccess }) {
-  const [step, setStep] = useState('email');
+export default function LoginPage({ shareToken, errorMessage }) {
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(errorMessage || '');
 
-  // ─── Step 1: Request OTP via Supabase ────────────────────
-
-  async function handleRequestOtp(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    const redirectTo =
+      `${window.location.origin}/auth/callback?share_token=${shareToken}`;
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
     });
 
     if (error) {
       setError(error.message);
     } else {
-      setStep('otp');
+      setSent(true);
     }
 
     setLoading(false);
   }
-
-  // ─── Step 2: Verify OTP via Supabase ─────────────────────
-
-  async function handleVerifyOtp(e) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'email',
-    });
-
-    if (verifyError) {
-      setError('Incorrect or expired code. Please try again.');
-      setLoading(false);
-      return;
-    }
-
-    // Confirm this email is authorized for the request
-    const { data: request } = await supabase
-      .from('requests')
-      .select('id')
-      .eq('share_token', shareToken)
-      .single();
-
-    if (!request) {
-      await supabase.auth.signOut();
-      setError('This share link is invalid or expired.');
-      setLoading(false);
-      return;
-    }
-
-    const { data: item } = await supabase
-      .from('request_items')
-      .select('id')
-      .eq('request_id', request.id)
-      .eq('contact_email', email.toLowerCase())
-      .limit(1)
-      .maybeSingle();
-
-    if (!item) {
-      await supabase.auth.signOut();
-      setError('This email is not authorized for this request.');
-      setLoading(false);
-      return;
-    }
-
-    localStorage.setItem('share_token', shareToken);
-    onLoginSuccess(null, `/upload/${request.id}`);
-    setLoading(false);
-  }
-
-  function handleResendCode() {
-    setStep('email');
-    setOtp('');
-    setError('');
-  }
-
-  // ─── Render ───────────────────────────────────────────────
 
   return (
     <div style={styles.page}>
@@ -97,17 +36,29 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
           <span style={styles.logoText}>Riveron</span>
         </div>
 
-        {step === 'email' ? (
-          <form onSubmit={handleRequestOtp} noValidate>
+        {sent ? (
+          <>
+            <h1 style={styles.heading}>Check your email</h1>
+            <p style={styles.subheading}>
+              We sent a sign-in link to <strong>{email}</strong>. Click the link to
+              access your data request — it expires in 10 minutes.
+            </p>
+            <button
+              style={styles.linkButton}
+              onClick={() => { setSent(false); setEmail(''); setError(''); }}
+            >
+              Use a different email
+            </button>
+          </>
+        ) : (
+          <form onSubmit={handleSubmit} noValidate>
             <h1 style={styles.heading}>Access your data request</h1>
             <p style={styles.subheading}>
-              Enter the email address associated with this request. We'll send you a
-              one-time verification code.
+              Enter the email address associated with this request and we'll send
+              you a secure sign-in link.
             </p>
 
-            <label style={styles.label} htmlFor="email">
-              Email address
-            </label>
+            <label style={styles.label} htmlFor="email">Email address</label>
             <input
               id="email"
               type="email"
@@ -127,52 +78,7 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
               style={{ ...styles.button, ...(loading || !email.trim() ? styles.buttonDisabled : {}) }}
               disabled={loading || !email.trim()}
             >
-              {loading ? 'Sending…' : 'Send verification code'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} noValidate>
-            <h1 style={styles.heading}>Enter your code</h1>
-            <p style={styles.subheading}>
-              We sent a 6-digit code to <strong>{email}</strong>. It expires in 10
-              minutes.
-            </p>
-
-            <label style={styles.label} htmlFor="otp">
-              Verification code
-            </label>
-            <input
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              required
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              placeholder="000000"
-              style={styles.otpInput}
-              disabled={loading}
-              autoFocus
-            />
-
-            {error && <p style={styles.error}>{error}</p>}
-
-            <button
-              type="submit"
-              style={{ ...styles.button, ...(loading || otp.length !== 6 ? styles.buttonDisabled : {}) }}
-              disabled={loading || otp.length !== 6}
-            >
-              {loading ? 'Verifying…' : 'Verify code'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleResendCode}
-              style={styles.linkButton}
-              disabled={loading}
-            >
-              Resend or use a different email
+              {loading ? 'Sending…' : 'Send sign-in link'}
             </button>
           </form>
         )}
@@ -180,8 +86,6 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
     </div>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────
 
 const styles = {
   page: {
@@ -193,7 +97,7 @@ const styles = {
     padding: '24px',
   },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     borderRadius: '12px',
     boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
     padding: '48px 40px',
@@ -231,25 +135,8 @@ const styles = {
   input: {
     display: 'block',
     width: '100%',
-    boxSizing: 'border-box',
     padding: '10px 12px',
     fontSize: '15px',
-    border: '1.5px solid #ddd',
-    borderRadius: '8px',
-    outline: 'none',
-    marginBottom: '20px',
-    color: '#111',
-    backgroundColor: '#fff',
-  },
-  otpInput: {
-    display: 'block',
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '14px 16px',
-    fontSize: '28px',
-    fontFamily: 'monospace',
-    letterSpacing: '8px',
-    textAlign: 'center',
     border: '1.5px solid #ddd',
     borderRadius: '8px',
     outline: 'none',
@@ -275,20 +162,17 @@ const styles = {
     cursor: 'not-allowed',
   },
   linkButton: {
-    display: 'block',
-    width: '100%',
-    padding: '8px',
-    fontSize: '13px',
-    color: '#555',
-    backgroundColor: 'transparent',
+    background: 'none',
     border: 'none',
-    cursor: 'pointer',
+    color: '#555',
+    fontSize: '13px',
     textDecoration: 'underline',
-    textAlign: 'center',
+    cursor: 'pointer',
+    padding: 0,
   },
   error: {
     fontSize: '13px',
     color: '#c0392b',
-    margin: '0 0 16px',
+    margin: '-12px 0 16px',
   },
 };
