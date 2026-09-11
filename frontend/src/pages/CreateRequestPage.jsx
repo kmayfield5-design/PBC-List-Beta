@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase.js';
+import { parseXlsx, DEFAULT_AREAS } from '../lib/parseXlsx.js';
 import Header from '../components/Header.jsx';
 
 function generateShareToken() {
@@ -10,31 +11,22 @@ function generateShareToken() {
 
 const BLANK_ITEM = () => ({
   _id: crypto.randomUUID(),
+  // Fields shown in the manual entry grid
   area: '',
   itemName: '',
   contactEmail: '',
   deadline: '',
   owner: '',
+  // Additional fields populated by Excel import; not shown in the grid
+  description: '',
+  workstream: '',
+  period: '',
+  expected_format: '',
+  priority: 'normal',
+  reviewer: '',
+  sensitivity: 'standard',
+  source_row: null,
 });
-
-// Normalise an Excel date serial or string to YYYY-MM-DD (or empty string)
-function normaliseDate(value) {
-  if (!value) return '';
-  if (typeof value === 'number') {
-    // Excel date serial → JS Date
-    const date = XLSX.SSF.parse_date_code(value);
-    if (!date) return '';
-    const mm = String(date.m).padStart(2, '0');
-    const dd = String(date.d).padStart(2, '0');
-    return `${date.y}-${mm}-${dd}`;
-  }
-  // Already a string — accept YYYY-MM-DD or MM/DD/YYYY
-  const iso = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const d = new Date(iso);
-  if (!isNaN(d)) return d.toISOString().slice(0, 10);
-  return '';
-}
 
 export default function CreateRequestPage() {
   const navigate = useNavigate();
@@ -43,7 +35,7 @@ export default function CreateRequestPage() {
   const [items, setItems] = useState([BLANK_ITEM()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [importError, setImportError] = useState('');
+  const [importError, setImportError] = useState(null); // string | string[] | null
   const [created, setCreated] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const importRef = useRef(null);
@@ -55,6 +47,7 @@ export default function CreateRequestPage() {
   // ─── Item helpers ─────────────────────────────────────────
 
   function addItem() {
+    setImportError(null);
     setItems((prev) => [...prev, BLANK_ITEM()]);
   }
 
@@ -72,12 +65,24 @@ export default function CreateRequestPage() {
 
   function exportTemplate() {
     const rows = [
-      ['Area', 'Item Name', 'Contact Email', 'Deadline (YYYY-MM-DD)', 'Owner'],
-      ['Financial Statements', 'Audited financials FY2024', 'cfo@client.com', '2026-10-15', 'Jane Smith'],
-      ['Legal', 'Articles of incorporation', 'legal@client.com', '2026-10-20', 'John Doe'],
+      [
+        'Item name', 'Contact email', 'Area', 'Due date',
+        'Description', 'Workstream', 'Period', 'Format', 'Priority', 'Owner',
+      ],
+      [
+        'Audited financials FY2024', 'cfo@client.com', 'Finance', '2026-10-15',
+        'Most recent audited financial statements', '', 'FY2024', 'pdf', 'normal', 'Jane Smith',
+      ],
+      [
+        'Articles of incorporation', 'legal@client.com', 'Legal', '2026-10-20',
+        '', '', '', 'pdf', 'normal', 'John Doe',
+      ],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 24 }, { wch: 36 }, { wch: 30 }, { wch: 22 }, { wch: 20 }];
+    ws['!cols'] = [
+      { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
+      { wch: 36 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 18 },
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Request Items');
     XLSX.writeFile(wb, 'data-request-template.xlsx');
@@ -88,43 +93,32 @@ export default function CreateRequestPage() {
   function handleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
-    setImportError('');
+    setImportError(null);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: false });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const { items, errors } = parseXlsx(evt.target.result, { areas: DEFAULT_AREAS });
 
-        if (rows.length === 0) {
-          setImportError('The file appears to be empty.');
-          return;
+      if (errors.length > 0) {
+        // Separate file-level errors from per-row errors for display
+        const fileLevelErrors = errors.filter((err) => err.row === null);
+        const rowErrors = errors.filter((err) => err.row !== null);
+
+        if (fileLevelErrors.length > 0 && rowErrors.length === 0) {
+          // Simple single message (e.g. empty file, missing column)
+          setImportError(fileLevelErrors.map((err) => err.message).join(' '));
+        } else {
+          // Per-row validation report — show all so the team can fix at once
+          setImportError(
+            [...fileLevelErrors, ...rowErrors].map((err) => err.message)
+          );
         }
-
-        const imported = rows
-          .map((row) => ({
-            _id: crypto.randomUUID(),
-            area: String(row['Area'] ?? '').trim(),
-            itemName: String(row['Item Name'] ?? '').trim(),
-            contactEmail: String(row['Contact Email'] ?? '').trim(),
-            deadline: normaliseDate(row['Deadline (YYYY-MM-DD)'] ?? row['Deadline'] ?? ''),
-            owner: String(row['Owner'] ?? '').trim(),
-          }))
-          .filter((i) => i.itemName || i.contactEmail);
-
-        if (imported.length === 0) {
-          setImportError('No valid rows found. Make sure columns match the template headers.');
-          return;
-        }
-
-        setItems(imported);
-      } catch {
-        setImportError('Could not read the file. Make sure it is a valid .xlsx or .csv.');
-      } finally {
-        // Reset so the same file can be re-imported
-        if (importRef.current) importRef.current.value = '';
+      } else {
+        setItems(items);
       }
+
+      // Reset so the same file can be re-imported after fixing it
+      if (importRef.current) importRef.current.value = '';
     };
     reader.readAsArrayBuffer(file);
   }
@@ -178,12 +172,22 @@ export default function CreateRequestPage() {
 
     const { error: itemsError } = await supabase.from('request_items').insert(
       validItems.map((item) => ({
-        request_id: request.id,
-        area: item.area.trim() || null,
-        item_name: item.itemName.trim(),
-        contact_email: item.contactEmail.trim().toLowerCase(),
-        deadline: item.deadline || null,
-        owner: item.owner.trim() || null,
+        request_id:      request.id,
+        area:            item.area.trim() || null,
+        item_name:       item.itemName.trim(),
+        contact_email:   item.contactEmail.trim().toLowerCase(),
+        deadline:        item.deadline || null,
+        owner:           item.owner?.trim() || null,
+        description:     item.description?.trim() || null,
+        workstream:      item.workstream?.trim() || null,
+        period:          item.period?.trim() || null,
+        expected_format: item.expected_format?.trim() || null,
+        priority:        item.priority || 'normal',
+        reviewer:        item.reviewer?.trim() || null,
+        sensitivity:     item.sensitivity || 'standard',
+        requested_by:    user?.id || null,
+        requested_at:    new Date().toISOString(),
+        source_row:      item.source_row ?? null,
       }))
     );
 
@@ -295,7 +299,20 @@ export default function CreateRequestPage() {
               </div>
             </div>
 
-            {importError && <p style={styles.importError}>{importError}</p>}
+            {importError && (
+              <div style={styles.importError}>
+                {Array.isArray(importError) ? (
+                  <>
+                    <p style={{ margin: '0 0 6px', fontWeight: '600' }}>
+                      {importError.length} error{importError.length !== 1 ? 's' : ''} found — fix the spreadsheet and import again:
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                      {importError.map((msg, i) => <li key={i} style={{ marginBottom: '2px' }}>{msg}</li>)}
+                    </ul>
+                  </>
+                ) : importError}
+              </div>
+            )}
 
             {/* Column headers */}
             <div style={styles.itemHeader}>
@@ -498,9 +515,10 @@ const styles = {
     fontSize: '13px',
     color: '#c0392b',
     backgroundColor: '#fde8e8',
-    padding: '8px 12px',
+    padding: '10px 14px',
     borderRadius: '6px',
     marginBottom: '12px',
+    lineHeight: '1.5',
   },
   itemHeader: {
     display: 'flex',

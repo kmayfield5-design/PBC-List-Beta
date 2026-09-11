@@ -149,6 +149,9 @@ PBC-List-Beta/
       lib/
         supabase.js           # Supabase client (anon key)
         theme.js              # Riveron design tokens — all color/font/spacing values
+        parseXlsx.js          # Excel import parser: alias map, normalisation, validation report
+        __tests__/
+          parseXlsx.test.js   # Vitest tests — programmatic xlsx fixtures, all-or-nothing behaviour
       components/
         Header.jsx            # Sticky top bar: logo, page title slot, right slot
         ProtectedRoute.jsx    # Redirects to / if no Supabase session
@@ -343,5 +346,11 @@ Current coverage:
 
 ### Frontend
 
-No frontend tests exist. If added, use Vitest (it integrates with Vite without extra
-configuration). Document the choice here when it's made.
+Vitest is the chosen runner (integrates with Vite; no separate config file needed).
+Install with `npm install --save-dev vitest` from `frontend/`. Run with `npm test`.
+
+Current coverage:
+- `frontend/src/lib/__tests__/parseXlsx.test.js` — unit tests for the Excel import
+  parser: header alias mapping, area normalisation, priority normalisation, date
+  parsing (serial numbers, string formats, unparseable values), missing required
+  columns, invalid emails, and all-or-nothing import behaviour.
