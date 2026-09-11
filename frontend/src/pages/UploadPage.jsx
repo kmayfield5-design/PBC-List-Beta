@@ -38,6 +38,7 @@ export default function UploadPage() {
 
   const [request, setRequest] = useState(null);
   const [items, setItems] = useState([]);
+  const [clientEmail, setClientEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(new Set());
@@ -57,6 +58,7 @@ export default function UploadPage() {
       }
 
       const email = session.user.email.toLowerCase();
+      setClientEmail(email);
 
       const [{ data: req, error: reqErr }, { data: itemRows, error: itemErr }] =
         await Promise.all([
@@ -67,9 +69,9 @@ export default function UploadPage() {
             .single(),
           supabase
             .from('request_items')
-            .select('id, area, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+            .select('id, area, item_name, contact_email, owner, deadline, status, file_path, uploaded_at, notes')
             .eq('request_id', requestId)
-            .eq('contact_email', email)
+            .order('area', { ascending: true, nullsFirst: false })
             .order('deadline', { ascending: true, nullsFirst: false }),
         ]);
 
@@ -152,6 +154,14 @@ export default function UploadPage() {
 
   const completedCount = items.filter((i) => i.status === 'complete').length;
 
+  // Group by area preserving order
+  const grouped = new Map();
+  for (const item of items) {
+    const key = item.area?.trim() || '—';
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(item);
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -185,8 +195,8 @@ export default function UploadPage() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Area</th>
                   <th style={styles.th}>Item</th>
+                  <th style={styles.th}>Assigned to</th>
                   <th style={styles.th}>Owner</th>
                   <th style={styles.th}>Deadline</th>
                   <th style={styles.th}>Status</th>
@@ -195,57 +205,70 @@ export default function UploadPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
-                  const isUploading = uploading.has(item.id);
-                  const overdue = isOverdue(item.deadline, item.status);
-
-                  return (
-                    <tr key={item.id} style={styles.tr}>
-                      <td style={{ ...styles.td, color: '#888', fontSize: '13px' }}>
-                        {item.area || '—'}
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.itemName}>{item.item_name}</span>
-                        {item.notes && <span style={styles.notes}>{item.notes}</span>}
-                      </td>
-                      <td style={styles.td}>{item.owner || '—'}</td>
-                      <td style={{ ...styles.td, color: overdue ? '#c0392b' : 'inherit' }}>
-                        {formatDeadline(item.deadline)}
-                        {overdue && <span style={styles.overdueTag}>Overdue</span>}
-                      </td>
-                      <td style={styles.td}>
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td style={styles.td}>
-                        {item.file_path ? (
-                          <span style={styles.fileName}>
-                            {item.file_path.split('/').pop().replace(/^\d+-/, '')}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#bbb' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ ...styles.td, textAlign: 'right' }}>
-                        <input
-                          ref={(el) => (fileInputRefs.current[item.id] = el)}
-                          type="file"
-                          style={{ display: 'none' }}
-                          onChange={(e) => handleFileSelect(item.id, e.target.files[0])}
-                        />
-                        <button
-                          style={{
-                            ...styles.uploadBtn,
-                            ...(isUploading ? styles.uploadBtnDisabled : {}),
-                          }}
-                          disabled={isUploading}
-                          onClick={() => fileInputRefs.current[item.id]?.click()}
-                        >
-                          {isUploading ? 'Uploading…' : item.file_path ? 'Replace' : 'Upload'}
-                        </button>
-                      </td>
+                {Array.from(grouped.entries()).map(([area, areaItems]) => (
+                  <>
+                    <tr key={`area-${area}`}>
+                      <td colSpan={7} style={styles.areaHeader}>{area}</td>
                     </tr>
-                  );
-                })}
+                    {areaItems.map((item) => {
+                      const isUploading = uploading.has(item.id);
+                      const overdue = isOverdue(item.deadline, item.status);
+                      const isOwn = item.contact_email?.toLowerCase() === clientEmail;
+
+                      return (
+                        <tr key={item.id} style={styles.tr}>
+                          <td style={styles.td}>
+                            <span style={styles.itemName}>{item.item_name}</span>
+                            {item.notes && <span style={styles.notes}>{item.notes}</span>}
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ fontSize: '13px', color: '#555' }}>
+                              {item.contact_email}
+                            </span>
+                            {isOwn && (
+                              <span style={styles.youBadge}>you</span>
+                            )}
+                          </td>
+                          <td style={styles.td}>{item.owner || '—'}</td>
+                          <td style={{ ...styles.td, color: overdue ? '#c0392b' : 'inherit' }}>
+                            {formatDeadline(item.deadline)}
+                            {overdue && <span style={styles.overdueTag}>Overdue</span>}
+                          </td>
+                          <td style={styles.td}>
+                            <StatusBadge status={item.status} />
+                          </td>
+                          <td style={styles.td}>
+                            {item.file_path ? (
+                              <span style={styles.fileName}>
+                                {item.file_path.split('/').pop().replace(/^\d+-/, '')}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#bbb' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: 'right' }}>
+                            <input
+                              ref={(el) => (fileInputRefs.current[item.id] = el)}
+                              type="file"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileSelect(item.id, e.target.files[0])}
+                            />
+                            <button
+                              style={{
+                                ...styles.uploadBtn,
+                                ...(isUploading ? styles.uploadBtnDisabled : {}),
+                              }}
+                              disabled={isUploading}
+                              onClick={() => fileInputRefs.current[item.id]?.click()}
+                            >
+                              {isUploading ? 'Uploading…' : item.file_path ? 'Replace' : 'Upload'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
+                ))}
               </tbody>
             </table>
           </div>
@@ -397,5 +420,27 @@ const styles = {
   uploadBtnDisabled: {
     backgroundColor: '#999',
     cursor: 'not-allowed',
+  },
+  areaHeader: {
+    padding: '10px 16px',
+    fontSize: '11px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color: '#888',
+    backgroundColor: '#f7f7f7',
+    borderTop: '1px solid #efefef',
+    borderBottom: '1px solid #efefef',
+  },
+  youBadge: {
+    display: 'inline-block',
+    marginLeft: '6px',
+    fontSize: '10px',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    color: '#1d4ed8',
+    backgroundColor: '#dbeafe',
+    padding: '1px 5px',
+    borderRadius: '4px',
   },
 };
