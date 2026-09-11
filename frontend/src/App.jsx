@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useParams, useNavigate } from 'react-rout
 import AdvisorLoginPage from './pages/AdvisorLoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import CreateRequestPage from './pages/CreateRequestPage.jsx';
+import RequestDetailPage from './pages/RequestDetailPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import UploadPage from './pages/UploadPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -42,7 +43,7 @@ export default function App() {
         />
         <Route
           path="/dashboard/:requestId"
-          element={<ProtectedRoute><div style={{ padding: 40, fontFamily: 'sans-serif' }}>Request detail — coming soon.</div></ProtectedRoute>}
+          element={<ProtectedRoute><RequestDetailPage /></ProtectedRoute>}
         />
 
         {/* Client routes */}
