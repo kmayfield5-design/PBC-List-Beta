@@ -6,6 +6,9 @@ const supabase = require('../config/supabase');
 const { verifyJWT } = require('../middleware/auth');
 const { verifyAdvisorJWT } = require('../middleware/advisorAuth');
 const { insertItemWithRefCode, AREA_PREFIXES } = require('../lib/refCode');
+const {
+  parseSort, parseFilters, parsePagination, applyFilters, computeFacet,
+} = require('../lib/itemsQuery');
 
 const router = express.Router();
 const upload = multer({
@@ -139,16 +142,109 @@ router.post('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
   return res.status(201).json({ success: true, item });
 });
 
+/**
+ * GET /api/requests/:requestId/items
+ *
+ * Full-featured item list for the advisor dashboard: filtering, sorting,
+ * pagination, and facet counts — all against the request_items_enriched view.
+ *
+ * Query parameters:
+ *   area, status, priority, requested_by, reviewer, workstream, sensitivity
+ *     — comma-separated; values within one param combine with OR,
+ *       different params combine with AND
+ *   due_from, due_to     — ISO date, inclusive deadline range
+ *   uploaded_from, uploaded_to — ISO date, inclusive upload range
+ *   overdue              — 'true' | 'false'
+ *   due_within           — positive integer days (today … today + N)
+ *   q                    — free text across item_name, ref_code, description,
+ *                          contact_email, period
+ *   sort                 — column name; prefix with '-' for descending
+ *   page, limit          — pagination; default 50, max 200
+ *
+ * Response: { items, total, page, limit, facets }
+ * Facets: per-value counts for area, status, priority, and requested_by,
+ * computed without each facet's own constraint so counts stay accurate
+ * when a filter is already active.
+ */
+router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
+  const { requestId } = req.params;
+  const advisorId = req.advisor.id;
+
+  // ── 1. Validate sort before touching the DB ───────────────────
+  const sort = parseSort(req.query.sort);
+  if (sort.error) {
+    return res.status(400).json({ success: false, message: sort.error });
+  }
+
+  // ── 2. Authorization: request must belong to this advisor ──────
+  const { data: request, error: reqError } = await supabase
+    .from('requests')
+    .select('id')
+    .eq('id', requestId)
+    .eq('created_by', advisorId)
+    .single();
+
+  if (reqError || !request) {
+    return res.status(404).json({ success: false, message: 'Request not found.' });
+  }
+
+  // ── 3. Parse filters and pagination ───────────────────────────
+  const filters = parseFilters(req.query);
+  const { page, limit, offset } = parsePagination(req.query);
+
+  // ── 4. Main paginated query ───────────────────────────────────
+  const baseBuilder = () =>
+    applyFilters(
+      supabase
+        .from('request_items_enriched')
+        .eq('request_id', requestId),
+      filters
+    );
+
+  const { data: items, count, error: itemsError } = await baseBuilder()
+    .select('*', { count: 'exact' })
+    .order(sort.field, { ascending: sort.ascending, nullsFirst: sort.nullsFirst })
+    .range(offset, offset + limit - 1);
+
+  if (itemsError) {
+    console.error('request_items_enriched fetch failed:', itemsError.message);
+    return res.status(500).json({ success: false, message: 'Failed to load items.' });
+  }
+
+  // ── 5. Facet counts (each query skips its own filter) ─────────
+  const [areaFacet, statusFacet, priorityFacet, requestedByFacet] = await Promise.all([
+    computeFacet(supabase, requestId, filters, 'area'),
+    computeFacet(supabase, requestId, filters, 'status'),
+    computeFacet(supabase, requestId, filters, 'priority'),
+    computeFacet(supabase, requestId, filters, 'requested_by'),
+  ]);
+
+  return res.json({
+    success: true,
+    items:  items ?? [],
+    total:  count ?? 0,
+    page,
+    limit,
+    facets: {
+      area:         areaFacet,
+      status:       statusFacet,
+      priority:     priorityFacet,
+      requested_by: requestedByFacet,
+    },
+  });
+});
+
 // ─── Client routes ────────────────────────────────────────────
 // These require the custom client JWT (issued after OTP verification).
 // Authorization: the token's request_id must match the URL param.
 
 /**
- * GET /api/requests/:requestId/items
+ * GET /api/requests/:requestId/my-items
  *
- * Returns the request and the authenticated client's items.
+ * Returns only the items assigned to the authenticated client's email.
+ * Used by the client upload portal (OTP auth flow).
  */
-router.get('/:requestId/items', verifyJWT, async (req, res) => {
+router.get('/:requestId/my-items', verifyJWT, async (req, res) => {
   const { requestId } = req.params;
   const { request_id, email } = req.user;
 

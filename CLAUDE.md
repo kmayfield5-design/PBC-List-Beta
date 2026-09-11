@@ -77,11 +77,13 @@ through the Express backend.
 The Express backend has two route groups with different auth:
 
 **Client routes** — validated by `verifyJWT` (custom JWT signed with `JWT_SECRET`):
-- `GET /api/requests/:requestId/items` — returns items for the client's email
+- `GET /api/requests/:requestId/my-items` — returns only the client's own items
 - `POST /api/requests/:requestId/items/:itemId/upload` — file upload
 
 **Advisor routes** — validated by `verifyAdvisorJWT` (calls `supabase.auth.getUser()`):
 - `GET /api/requests/:requestId` — project + vocabulary for the advisor dashboard
+- `GET /api/requests/:requestId/items` — full-featured item list: filtering, sorting,
+  pagination, and facet counts against `request_items_enriched`
 - `POST /api/requests/:requestId/items` — creates an item, generating a ref_code
 
 All backend mutations write to `audit_log`; Supabase-direct frontend mutations do not.
@@ -175,6 +177,7 @@ PBC-List-Beta/
     lib/
       refCode.js              # generateRefCode + insertItemWithRefCode (concurrent-safe)
       vocabulary.js           # DEFAULT_VOCABULARY constant (mirrors the SQL column default)
+      itemsQuery.js           # parseSort, parseFilters, applyFilters, computeFacet helpers
     middleware/
       auth.js                 # verifyJWT: validates custom client JWT
       advisorAuth.js          # verifyAdvisorJWT: validates Supabase Auth token via getUser()
@@ -183,6 +186,8 @@ PBC-List-Beta/
       requests.js             # Advisor: GET /:id, POST /:id/items — Client: GET /:id/items, POST /:id/items/:id/upload
     __tests__/
       refCode.test.js         # Jest unit tests including concurrent-insert case
+      itemsQuery.test.js      # Unit tests for all filter/sort/pagination helpers
+      itemsList.test.js       # Integration tests for GET /:requestId/items (Supertest)
   db/
     schema.sql                # Canonical Postgres schema: tables, RLS, indexes
   riveron_tracker_complete_flow.svg   # Architecture diagram (not served in the app)
@@ -343,6 +348,17 @@ Current coverage:
 - `backend/__tests__/refCode.test.js` — unit tests for `generateRefCode` and
   `insertItemWithRefCode`, including prefix mapping, zero-padding, count-based sequencing,
   and the concurrent-insert retry scenario (23505 unique violation).
+- `backend/__tests__/itemsQuery.test.js` — unit tests for `parseSort`, `parseCommaList`,
+  `parsePagination`, `parseFilters`, and `applyFilters`. Uses a recording builder to
+  verify each filter calls the correct Supabase method with correct args, AND/OR
+  combination semantics, facet-skip behaviour, SQL-injection rejection via sort
+  allowlist, and due_within date bounds.
+- `backend/__tests__/itemsList.test.js` — Supertest integration tests for
+  `GET /:requestId/items`: auth/ownership check, sort validation (400 on invalid
+  field), response shape (items/total/page/limit/facets), pagination clamping, and
+  every filter parameter accepted without 4xx.
+
+Supertest (`supertest@^7`) is also installed as a dev dependency.
 
 ### Frontend
 
