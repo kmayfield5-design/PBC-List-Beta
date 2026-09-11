@@ -100,7 +100,10 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundImage: 'linear-gradient(rgba(7,23,57,0.88), rgba(7,23,57,0.88)), url("/hero-river.png")',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
   },
   card: {
     display: 'flex',
@@ -110,20 +113,21 @@ const styles = {
     padding: '48px 40px',
     backgroundColor: '#fff',
     borderRadius: '12px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
+    boxShadow: '0 24px 64px rgba(7,23,57,0.32)',
   },
   spinner: {
     width: '32px',
     height: '32px',
-    border: '3px solid #e0e0e0',
-    borderTopColor: '#1a1a1a',
+    border: '3px solid #dadde6',
+    borderTopColor: '#379190',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
   text: {
     fontSize: '14px',
-    color: '#555',
+    color: '#4c6382',
     margin: 0,
+    fontFamily: 'Arial, Helvetica, sans-serif',
   },
 };
 

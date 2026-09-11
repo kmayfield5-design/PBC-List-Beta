@@ -6,7 +6,7 @@ import Header from '../components/Header.jsx';
 const STATUS_STYLES = {
   active:    { label: 'Active',    bg: '#d1fae5', color: '#059669' },
   completed: { label: 'Completed', bg: '#dbeafe', color: '#2563eb' },
-  archived:  { label: 'Archived',  bg: '#f3f4f6', color: '#6b7280' },
+  archived:  { label: 'Archived',  bg: '#f0f1f5', color: '#6b7d94' },
 };
 
 function StatusBadge({ status }) {
@@ -150,7 +150,7 @@ export default function DashboardPage() {
         title="Data Request Dashboard"
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '13px', color: '#94a3b8' }}>{user?.email}</span>
+            <span style={{ fontSize: '13px', color: '#6b7d94' }}>{user?.email}</span>
             <button style={styles.headerBtn} onClick={() => setShowPasswordModal(true)}>Set password</button>
             <button style={styles.headerBtn} onClick={handleSignOut}>Sign out</button>
           </div>
@@ -249,7 +249,7 @@ export default function DashboardPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fafbfc',
   },
   container: {
     maxWidth: '1000px',
@@ -258,9 +258,10 @@ const styles = {
   },
   headerBtn: {
     fontSize: '13px',
-    color: '#cbd5e1',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#a0b0c8',
     background: 'none',
-    border: '1px solid #334155',
+    border: '1px solid #1a3060',
     borderRadius: '6px',
     padding: '5px 12px',
     cursor: 'pointer',
@@ -276,7 +277,8 @@ const styles = {
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111827',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739',
     margin: 0,
   },
   toolbarRight: {
@@ -288,36 +290,39 @@ const styles = {
     display: 'flex',
     borderRadius: '8px',
     overflow: 'hidden',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dadde6',
   },
   filterBtn: {
     padding: '7px 14px',
     fontSize: '13px',
     fontWeight: '500',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     background: '#fff',
     border: 'none',
     cursor: 'pointer',
-    color: '#6b7280',
+    color: '#4c6382',
   },
   filterBtnActive: {
-    background: '#0f172a',
+    background: '#071739',
     color: '#fff',
   },
   newBtn: {
     padding: '8px 16px',
     fontSize: '13px',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     color: '#fff',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(55,145,144,0.3)',
   },
   tableWrapper: {
     backgroundColor: '#fff',
-    borderRadius: '11px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    borderRadius: '12px',
+    border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -328,21 +333,22 @@ const styles = {
     padding: '12px 16px',
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#9ca3af',
+    color: '#6b7d94',
     textAlign: 'left',
-    borderBottom: '1px solid #e5e7eb',
-    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #dadde6',
+    backgroundColor: '#fafbfc',
   },
   tr: {
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f0f1f5',
     cursor: 'pointer',
   },
   td: {
     padding: '14px 16px',
     fontSize: '14px',
-    color: '#111827',
+    color: '#071739',
     verticalAlign: 'middle',
   },
   projectName: {
@@ -354,38 +360,40 @@ const styles = {
     borderRadius: '99px',
     fontSize: '12px',
     fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif',
   },
   progressTrack: {
     width: '80px',
     height: '6px',
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#dadde6',
     borderRadius: '99px',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   progressLabel: {
     fontSize: '12px',
-    color: '#9ca3af',
+    color: '#6b7d94',
     whiteSpace: 'nowrap',
   },
   copyBtn: {
     fontSize: '12px',
     fontWeight: '500',
-    color: '#111827',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739',
     background: 'none',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dadde6',
     borderRadius: '6px',
     padding: '4px 10px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
   viewArrow: {
-    color: '#9ca3af',
+    color: '#6b7d94',
     fontSize: '16px',
   },
   emptyState: {
@@ -393,7 +401,7 @@ const styles = {
     padding: '60px 0',
   },
   muted: {
-    color: '#9ca3af',
+    color: '#6b7d94',
     marginBottom: '16px',
   },
   errorText: {
@@ -404,31 +412,32 @@ const styles = {
 
 const modal = {
   overlay: {
-    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+    position: 'fixed', inset: 0, backgroundColor: 'rgba(7,23,57,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
   },
   card: {
-    backgroundColor: '#fff', borderRadius: '11px', padding: '36px',
-    width: '100%', maxWidth: '400px', border: '1px solid #e5e7eb',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+    backgroundColor: '#fff', borderRadius: '12px', padding: '36px',
+    width: '100%', maxWidth: '400px', border: '1px solid #dadde6',
+    boxShadow: '0 24px 64px rgba(7,23,57,0.2)',
   },
-  heading: { fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 8px' },
-  sub: { fontSize: '14px', color: '#6b7280', lineHeight: '1.6', margin: '0 0 20px' },
-  label: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#111827', marginBottom: '6px' },
+  heading: { fontSize: '18px', fontWeight: '700', fontFamily: 'Arial, Helvetica, sans-serif', color: '#071739', margin: '0 0 8px' },
+  sub: { fontSize: '14px', color: '#4c6382', lineHeight: '1.6', margin: '0 0 20px' },
+  label: { display: 'block', fontSize: '12px', fontWeight: '700', fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#071739', marginBottom: '6px' },
   input: {
     display: 'block', width: '100%', padding: '10px 12px', fontSize: '14px',
-    border: '1.5px solid #e5e7eb', borderRadius: '8px', outline: 'none',
-    marginBottom: '14px', color: '#111827', backgroundColor: '#fff',
+    border: '1.5px solid #dadde6', borderRadius: '8px', outline: 'none',
+    marginBottom: '14px', color: '#071739', backgroundColor: '#fff', boxSizing: 'border-box',
   },
   error: { fontSize: '13px', color: '#c0392b', margin: '-6px 0 12px' },
   actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' },
   btn: {
-    padding: '9px 20px', fontSize: '14px', fontWeight: '600', color: '#fff',
-    backgroundColor: '#0f172a', border: 'none', borderRadius: '8px', cursor: 'pointer',
+    padding: '9px 20px', fontSize: '14px', fontWeight: '700', fontFamily: 'Arial, Helvetica, sans-serif', color: '#fff',
+    backgroundColor: '#379190', border: 'none', borderRadius: '8px', cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(55,145,144,0.3)',
   },
-  btnDisabled: { backgroundColor: '#9ca3af', cursor: 'not-allowed' },
+  btnDisabled: { backgroundColor: '#6b7d94', boxShadow: 'none', cursor: 'not-allowed' },
   ghostBtn: {
-    padding: '9px 16px', fontSize: '14px', color: '#6b7280', backgroundColor: '#fff',
-    border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer',
+    padding: '9px 16px', fontSize: '14px', fontFamily: 'Arial, Helvetica, sans-serif', color: '#4c6382', backgroundColor: '#fff',
+    border: '1px solid #dadde6', borderRadius: '8px', cursor: 'pointer',
   },
 };

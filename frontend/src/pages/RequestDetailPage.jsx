@@ -8,7 +8,7 @@ const STORAGE_BUCKET = 'pbc-uploads';
 const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'complete'];
 
 const STATUS_STYLES = {
-  pending:  { bg: '#f3f4f6', color: '#6b7280' },
+  pending:  { bg: '#f0f1f5', color: '#6b7d94' },
   uploaded: { bg: '#dbeafe', color: '#2563eb' },
   reviewed: { bg: '#fef3c7', color: '#d97706' },
   complete: { bg: '#d1fae5', color: '#059669' },
@@ -18,7 +18,7 @@ const REQUEST_STATUS_OPTIONS = ['active', 'completed', 'archived'];
 const REQUEST_STATUS_STYLES = {
   active:    { bg: '#d1fae5', color: '#059669' },
   completed: { bg: '#dbeafe', color: '#2563eb' },
-  archived:  { bg: '#f3f4f6', color: '#6b7280' },
+  archived:  { bg: '#f0f1f5', color: '#6b7d94' },
 };
 
 function formatDate(dateStr) {
@@ -371,7 +371,7 @@ export default function RequestDetailPage() {
 
                       if (isEditing) {
                         return (
-                          <tr key={item.id} style={{ ...styles.tr, backgroundColor: '#fafafa' }}>
+                          <tr key={item.id} style={{ ...styles.tr, backgroundColor: '#f5f6fa' }}>
                             <td style={styles.td}>
                               <input
                                 style={styles.editInput}
@@ -412,7 +412,7 @@ export default function RequestDetailPage() {
                               />
                             </td>
                             <td style={styles.td} colSpan={3}>
-                              <span style={{ fontSize: '12px', color: '#aaa' }}>Status & file unchanged</span>
+                              <span style={{ fontSize: '12px', color: '#6b7d94' }}>Status & file unchanged</span>
                             </td>
                             <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
                               <button
@@ -444,7 +444,7 @@ export default function RequestDetailPage() {
                             <span style={styles.contactEmail}>{item.contact_email}</span>
                           </td>
                           <td style={styles.td}>{item.owner || '—'}</td>
-                          <td style={{ ...styles.td, color: overdue ? '#c0392b' : '#222' }}>
+                          <td style={{ ...styles.td, color: overdue ? '#c0392b' : '#071739' }}>
                             {formatDate(item.deadline)}
                             {overdue && <span style={styles.overdueTag}>Overdue</span>}
                           </td>
@@ -476,10 +476,10 @@ export default function RequestDetailPage() {
                                 {downloadingId === item.id ? '…' : '↓ Download'}
                               </button>
                             ) : (
-                              <span style={{ color: '#ccc' }}>—</span>
+                              <span style={{ color: '#dadde6' }}>—</span>
                             )}
                           </td>
-                          <td style={{ ...styles.td, fontSize: '12px', color: '#888' }}>
+                          <td style={{ ...styles.td, fontSize: '12px', color: '#6b7d94' }}>
                             {item.uploaded_at ? formatDate(item.uploaded_at) : '—'}
                           </td>
                           <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
@@ -573,7 +573,7 @@ export default function RequestDetailPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fafbfc',
   },
   container: {
     maxWidth: '1050px',
@@ -585,22 +585,23 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#9ca3af',
+    color: '#6b7d94',
   },
   backBtn: {
     background: 'none',
     border: 'none',
-    color: '#9ca3af',
+    color: '#6b7d94',
     fontSize: '13px',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     cursor: 'pointer',
     padding: '0 0 16px',
     display: 'block',
   },
   headerCard: {
     backgroundColor: '#fff',
-    borderRadius: '11px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    borderRadius: '12px',
+    border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
     padding: '28px',
     marginBottom: '16px',
   },
@@ -615,26 +616,29 @@ const styles = {
   eyebrow: {
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: '#9ca3af',
+    color: '#6b7d94',
     margin: '0 0 4px',
   },
   heading: {
     fontSize: '22px',
     fontWeight: '700',
-    color: '#111827',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739',
     margin: '0 0 4px',
   },
   meta: {
     fontSize: '13px',
-    color: '#9ca3af',
+    color: '#6b7d94',
     margin: 0,
   },
   statusSelect: {
     padding: '6px 10px',
     fontSize: '13px',
     fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     border: 'none',
     borderRadius: '99px',
     cursor: 'pointer',
@@ -644,9 +648,10 @@ const styles = {
     padding: '7px 14px',
     fontSize: '13px',
     fontWeight: '500',
-    color: '#111827',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739',
     backgroundColor: '#fff',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dadde6',
     borderRadius: '8px',
     cursor: 'pointer',
   },
@@ -658,27 +663,27 @@ const styles = {
   progressTrack: {
     flex: 1,
     height: '6px',
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#dadde6',
     borderRadius: '99px',
     overflow: 'hidden',
     maxWidth: '320px',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   progressLabel: {
     fontSize: '13px',
-    color: '#9ca3af',
+    color: '#6b7d94',
     whiteSpace: 'nowrap',
   },
   tableCard: {
     backgroundColor: '#fff',
-    borderRadius: '11px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    borderRadius: '12px',
+    border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -689,32 +694,34 @@ const styles = {
     padding: '12px 16px',
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#9ca3af',
+    color: '#6b7d94',
     textAlign: 'left',
-    borderBottom: '1px solid #e5e7eb',
-    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #dadde6',
+    backgroundColor: '#fafbfc',
     whiteSpace: 'nowrap',
   },
   areaHeader: {
     padding: '10px 16px',
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.07em',
-    color: '#6b7280',
-    backgroundColor: '#f8fafc',
-    borderTop: '1px solid #e5e7eb',
-    borderBottom: '1px solid #e5e7eb',
+    color: '#4c6382',
+    backgroundColor: '#fafbfc',
+    borderTop: '1px solid #dadde6',
+    borderBottom: '1px solid #dadde6',
   },
   tr: {
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f0f1f5',
   },
   td: {
     padding: '13px 16px',
     fontSize: '14px',
-    color: '#111827',
+    color: '#071739',
     verticalAlign: 'top',
   },
   itemName: {
@@ -724,18 +731,19 @@ const styles = {
   notes: {
     display: 'block',
     fontSize: '12px',
-    color: '#9ca3af',
+    color: '#6b7d94',
     marginTop: '2px',
   },
   contactEmail: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#4c6382',
   },
   overdueTag: {
     display: 'inline-block',
     marginLeft: '6px',
     fontSize: '10px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     color: '#c0392b',
     backgroundColor: '#fde8e8',
@@ -746,6 +754,7 @@ const styles = {
     padding: '4px 8px',
     fontSize: '12px',
     fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     border: 'none',
     borderRadius: '99px',
     cursor: 'pointer',
@@ -755,6 +764,7 @@ const styles = {
     padding: '4px 10px',
     fontSize: '12px',
     fontWeight: '500',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     color: '#2563eb',
     backgroundColor: '#dbeafe',
     border: 'none',
@@ -765,7 +775,7 @@ const styles = {
   deleteBtn: {
     background: 'none',
     border: 'none',
-    color: '#9ca3af',
+    color: '#6b7d94',
     fontSize: '18px',
     lineHeight: 1,
     cursor: 'pointer',
@@ -775,7 +785,7 @@ const styles = {
   editIconBtn: {
     background: 'none',
     border: 'none',
-    color: '#9ca3af',
+    color: '#6b7d94',
     fontSize: '15px',
     lineHeight: 1,
     cursor: 'pointer',
@@ -788,18 +798,19 @@ const styles = {
     width: '100%',
     padding: '5px 8px',
     fontSize: '13px',
-    border: '1.5px solid #e5e7eb',
+    border: '1.5px solid #dadde6',
     borderRadius: '6px',
     outline: 'none',
-    color: '#111827',
+    color: '#071739',
     backgroundColor: '#fff',
   },
   editSaveBtn: {
     padding: '5px 12px',
     fontSize: '12px',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     color: '#fff',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -808,22 +819,24 @@ const styles = {
   editCancelBtn: {
     padding: '5px 10px',
     fontSize: '12px',
-    color: '#6b7280',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382',
     backgroundColor: 'transparent',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dadde6',
     borderRadius: '6px',
     cursor: 'pointer',
   },
   addRow: {
     padding: '12px 16px',
-    borderTop: '1px solid #e5e7eb',
+    borderTop: '1px solid #dadde6',
   },
   addBtn: {
     background: 'none',
     border: 'none',
-    color: '#6b7280',
+    color: '#4c6382',
     fontSize: '13px',
     fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     cursor: 'pointer',
     padding: '4px 0',
   },
@@ -832,7 +845,7 @@ const styles = {
     gap: '8px',
     alignItems: 'center',
     padding: '12px 16px',
-    borderTop: '1px solid #e5e7eb',
+    borderTop: '1px solid #dadde6',
     flexWrap: 'wrap',
   },
   addInput: {
@@ -840,17 +853,18 @@ const styles = {
     minWidth: '100px',
     padding: '7px 10px',
     fontSize: '13px',
-    border: '1.5px solid #e5e7eb',
+    border: '1.5px solid #dadde6',
     borderRadius: '6px',
     outline: 'none',
-    color: '#111827',
+    color: '#071739',
   },
   addSaveBtn: {
     padding: '7px 16px',
     fontSize: '13px',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     color: '#fff',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -859,9 +873,10 @@ const styles = {
   addCancelBtn: {
     padding: '7px 12px',
     fontSize: '13px',
-    color: '#6b7280',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#4c6382',
     backgroundColor: 'transparent',
-    border: '1px solid #e5e7eb',
+    border: '1px solid #dadde6',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',

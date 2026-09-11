@@ -6,7 +6,7 @@ import Header from '../components/Header.jsx';
 const STORAGE_BUCKET = 'pbc-uploads';
 
 const STATUS_STYLES = {
-  pending:  { label: 'Pending',  bg: '#f3f4f6', color: '#6b7280' },
+  pending:  { label: 'Pending',  bg: '#f0f1f5', color: '#6b7d94' },
   uploaded: { label: 'Uploaded', bg: '#dbeafe', color: '#2563eb' },
   reviewed: { label: 'Reviewed', bg: '#fef3c7', color: '#d97706' },
   complete: { label: 'Complete', bg: '#d1fae5', color: '#059669' },
@@ -146,7 +146,7 @@ export default function UploadPage() {
   // ─── Render ───────────────────────────────────────────────
 
   if (loading) {
-    return <div style={styles.center}><p style={{ color: '#888' }}>Loading your request…</p></div>;
+    return <div style={styles.center}><p style={{ color: '#6b7d94' }}>Loading your request…</p></div>;
   }
 
   if (error) {
@@ -191,7 +191,7 @@ export default function UploadPage() {
 
         {/* Table */}
         {items.length === 0 ? (
-          <p style={{ color: '#888', marginTop: 32 }}>No items found for this request.</p>
+          <p style={{ color: '#6b7d94', marginTop: 32 }}>No items found for this request.</p>
         ) : (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
@@ -224,7 +224,7 @@ export default function UploadPage() {
                             {item.notes && <span style={styles.notes}>{item.notes}</span>}
                           </td>
                           <td style={styles.td}>
-                            <span style={{ fontSize: '13px', color: '#555' }}>
+                            <span style={{ fontSize: '13px', color: '#4c6382' }}>
                               {item.contact_email}
                             </span>
                             {isOwn && (
@@ -245,7 +245,7 @@ export default function UploadPage() {
                                 {item.file_path.split('/').pop().replace(/^\d+-/, '')}
                               </span>
                             ) : (
-                              <span style={{ color: '#bbb' }}>—</span>
+                              <span style={{ color: '#dadde6' }}>—</span>
                             )}
                           </td>
                           <td style={{ ...styles.td, textAlign: 'right' }}>
@@ -285,7 +285,7 @@ export default function UploadPage() {
 const styles = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fafbfc',
   },
   center: {
     minHeight: '100vh',
@@ -309,16 +309,18 @@ const styles = {
   },
   eyebrow: {
     fontSize: '12px',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
-    color: '#9ca3af',
+    color: '#6b7d94',
     margin: '0 0 4px',
   },
   heading: {
     fontSize: '24px',
     fontWeight: '700',
-    color: '#111827',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    color: '#071739',
     margin: 0,
   },
   progress: {
@@ -326,28 +328,28 @@ const styles = {
   },
   progressLabel: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#4c6382',
     display: 'block',
     marginBottom: '6px',
   },
   progressTrack: {
     width: '160px',
     height: '6px',
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#dadde6',
     borderRadius: '99px',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     borderRadius: '99px',
     transition: 'width 0.3s ease',
   },
   tableWrapper: {
     backgroundColor: '#fff',
-    borderRadius: '11px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    borderRadius: '12px',
+    border: '1px solid #dadde6',
+    boxShadow: '0 1px 4px rgba(7,23,57,0.06)',
     overflow: 'hidden',
   },
   table: {
@@ -358,20 +360,21 @@ const styles = {
     padding: '12px 16px',
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
-    color: '#9ca3af',
+    color: '#6b7d94',
     textAlign: 'left',
-    borderBottom: '1px solid #e5e7eb',
-    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #dadde6',
+    backgroundColor: '#fafbfc',
   },
   tr: {
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #f0f1f5',
   },
   td: {
     padding: '14px 16px',
     fontSize: '14px',
-    color: '#111827',
+    color: '#071739',
     verticalAlign: 'top',
   },
   itemName: {
@@ -381,7 +384,7 @@ const styles = {
   notes: {
     display: 'block',
     fontSize: '12px',
-    color: '#9ca3af',
+    color: '#6b7d94',
     marginTop: '2px',
   },
   overdueTag: {
@@ -389,6 +392,7 @@ const styles = {
     marginLeft: '6px',
     fontSize: '10px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     color: '#c0392b',
     backgroundColor: '#fde8e8',
@@ -401,46 +405,52 @@ const styles = {
     borderRadius: '99px',
     fontSize: '12px',
     fontWeight: '600',
+    fontFamily: 'Arial, Helvetica, sans-serif',
   },
   fileName: {
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#4c6382',
     fontFamily: 'monospace',
   },
   uploadBtn: {
     padding: '6px 14px',
     fontSize: '13px',
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     color: '#fff',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#379190',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    boxShadow: '0 2px 8px rgba(55,145,144,0.25)',
   },
   uploadBtnDisabled: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#6b7d94',
+    boxShadow: 'none',
     cursor: 'not-allowed',
   },
   areaHeader: {
     padding: '10px 16px',
     fontSize: '11px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
     letterSpacing: '0.07em',
-    color: '#6b7280',
-    backgroundColor: '#f8fafc',
-    borderTop: '1px solid #e5e7eb',
-    borderBottom: '1px solid #e5e7eb',
+    color: '#4c6382',
+    backgroundColor: '#fafbfc',
+    borderTop: '1px solid #dadde6',
+    borderBottom: '1px solid #dadde6',
   },
   youBadge: {
     display: 'inline-block',
     marginLeft: '6px',
     fontSize: '10px',
     fontWeight: '700',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     textTransform: 'uppercase',
-    color: '#2563eb',
-    backgroundColor: '#dbeafe',
+    color: '#379190',
+    backgroundColor: '#dceeed',
     padding: '1px 5px',
     borderRadius: '4px',
   },
