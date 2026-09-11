@@ -1,6 +1,5 @@
 import { useState } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { supabase } from '../lib/supabase.js';
 
 export default function LoginPage({ shareToken, onLoginSuccess }) {
   const [step, setStep] = useState('email');
@@ -8,79 +7,85 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [attemptsRemaining, setAttemptsRemaining] = useState(null);
 
-  // ─── Step 1: Request OTP ──────────────────────────────────
+  // ─── Step 1: Request OTP via Supabase ────────────────────
 
   async function handleRequestOtp(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/request-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ share_token: shareToken, email }),
-      });
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Something went wrong. Please try again.');
-        return;
-      }
-
+    if (error) {
+      setError(error.message);
+    } else {
       setStep('otp');
-    } catch {
-      setError('Unable to reach the server. Check your connection and try again.');
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }
 
-  // ─── Step 2: Verify OTP ───────────────────────────────────
+  // ─── Step 2: Verify OTP via Supabase ─────────────────────
 
   async function handleVerifyOtp(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ share_token: shareToken, email, otp_code: otp }),
-      });
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: 'email',
+    });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 429) {
-          setError('Too many attempts. Please request a new code.');
-          setAttemptsRemaining(0);
-        } else {
-          setAttemptsRemaining(data.attemptsRemaining ?? null);
-          setError(data.message || 'Incorrect code. Please try again.');
-        }
-        return;
-      }
-
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('share_token', shareToken);
-      onLoginSuccess(data.token, data.redirectTo);
-    } catch {
-      setError('Unable to reach the server. Check your connection and try again.');
-    } finally {
+    if (verifyError) {
+      setError('Incorrect or expired code. Please try again.');
       setLoading(false);
+      return;
     }
+
+    // Confirm this email is authorized for the request
+    const { data: request } = await supabase
+      .from('requests')
+      .select('id')
+      .eq('share_token', shareToken)
+      .single();
+
+    if (!request) {
+      await supabase.auth.signOut();
+      setError('This share link is invalid or expired.');
+      setLoading(false);
+      return;
+    }
+
+    const { data: item } = await supabase
+      .from('request_items')
+      .select('id')
+      .eq('request_id', request.id)
+      .eq('contact_email', email.toLowerCase())
+      .limit(1)
+      .maybeSingle();
+
+    if (!item) {
+      await supabase.auth.signOut();
+      setError('This email is not authorized for this request.');
+      setLoading(false);
+      return;
+    }
+
+    localStorage.setItem('share_token', shareToken);
+    onLoginSuccess(null, `/upload/${request.id}`);
+    setLoading(false);
   }
 
   function handleResendCode() {
     setStep('email');
     setOtp('');
     setError('');
-    setAttemptsRemaining(null);
   }
 
   // ─── Render ───────────────────────────────────────────────
@@ -119,7 +124,7 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
 
             <button
               type="submit"
-              style={{ ...styles.button, ...(loading ? styles.buttonDisabled : {}) }}
+              style={{ ...styles.button, ...(loading || !email.trim() ? styles.buttonDisabled : {}) }}
               disabled={loading || !email.trim()}
             >
               {loading ? 'Sending…' : 'Send verification code'}
@@ -151,20 +156,11 @@ export default function LoginPage({ shareToken, onLoginSuccess }) {
               autoFocus
             />
 
-            {error && (
-              <div style={styles.errorBlock}>
-                <p style={styles.error}>{error}</p>
-                {attemptsRemaining !== null && attemptsRemaining > 0 && (
-                  <p style={styles.attemptsNote}>
-                    {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
-                  </p>
-                )}
-              </div>
-            )}
+            {error && <p style={styles.error}>{error}</p>}
 
             <button
               type="submit"
-              style={{ ...styles.button, ...(loading ? styles.buttonDisabled : {}) }}
+              style={{ ...styles.button, ...(loading || otp.length !== 6 ? styles.buttonDisabled : {}) }}
               disabled={loading || otp.length !== 6}
             >
               {loading ? 'Verifying…' : 'Verify code'}
@@ -244,7 +240,6 @@ const styles = {
     marginBottom: '20px',
     color: '#111',
     backgroundColor: '#fff',
-    transition: 'border-color 0.15s',
   },
   otpInput: {
     display: 'block',
@@ -274,7 +269,6 @@ const styles = {
     borderRadius: '8px',
     cursor: 'pointer',
     marginBottom: '12px',
-    transition: 'background-color 0.15s',
   },
   buttonDisabled: {
     backgroundColor: '#999',
@@ -292,17 +286,9 @@ const styles = {
     textDecoration: 'underline',
     textAlign: 'center',
   },
-  errorBlock: {
-    marginBottom: '16px',
-  },
   error: {
     fontSize: '13px',
     color: '#c0392b',
-    margin: '0 0 4px',
-  },
-  attemptsNote: {
-    fontSize: '12px',
-    color: '#888',
-    margin: 0,
+    margin: '0 0 16px',
   },
 };

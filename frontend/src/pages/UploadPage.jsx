@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const STORAGE_BUCKET = 'pbc-uploads';
 
 const STATUS_STYLES = {
   pending:  { label: 'Pending',  bg: '#f0f0f0', color: '#555' },
@@ -21,13 +22,14 @@ function StatusBadge({ status }) {
 
 function formatDeadline(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
 }
 
-function isOverdue(dateStr) {
-  if (!dateStr) return false;
-  return new Date(dateStr) < new Date() && true;
+function isOverdue(dateStr, status) {
+  if (!dateStr || status === 'complete') return false;
+  return new Date(dateStr) < new Date();
 }
 
 export default function UploadPage() {
@@ -41,55 +43,59 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(new Set());
 
   const fileInputRefs = useRef({});
-
-  const token = localStorage.getItem('auth_token');
   const shareToken = localStorage.getItem('share_token');
 
-  // ─── Auth guard ──────────────────────────────────────────
+  // ─── Auth guard + fetch ───────────────────────────────────
 
   useEffect(() => {
-    if (!token) {
-      navigate(shareToken ? `/request/${shareToken}` : '/');
-    }
-  }, [token, shareToken, navigate]);
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession();
 
-  // ─── Fetch request + items ────────────────────────────────
-
-  useEffect(() => {
-    if (!token) return;
-
-    async function fetchItems() {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/api/requests/${requestId}/items`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.status === 401) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('share_token');
-          navigate(shareToken ? `/request/${shareToken}` : '/');
-          return;
-        }
-
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.message || 'Failed to load request items.');
-          return;
-        }
-
-        const data = await res.json();
-        setRequest(data.request);
-        setItems(data.items);
-      } catch {
-        setError('Unable to reach the server. Check your connection.');
-      } finally {
-        setLoading(false);
+      if (!session) {
+        navigate(shareToken ? `/request/${shareToken}` : '/');
+        return;
       }
+
+      const email = session.user.email.toLowerCase();
+
+      const [{ data: req, error: reqErr }, { data: itemRows, error: itemErr }] =
+        await Promise.all([
+          supabase
+            .from('requests')
+            .select('id, project_name, status')
+            .eq('id', requestId)
+            .single(),
+          supabase
+            .from('request_items')
+            .select('id, area, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+            .eq('request_id', requestId)
+            .eq('contact_email', email)
+            .order('deadline', { ascending: true, nullsFirst: false }),
+        ]);
+
+      if (reqErr || !req) {
+        setError('Request not found.');
+      } else if (itemErr) {
+        setError('Failed to load items.');
+      } else {
+        setRequest(req);
+        setItems(itemRows || []);
+      }
+
+      setLoading(false);
     }
 
-    fetchItems();
-  }, [requestId, token, shareToken, navigate]);
+    init();
+
+    // Redirect to login if session expires mid-visit
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        navigate(shareToken ? `/request/${shareToken}` : '/');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [requestId, shareToken, navigate]);
 
   // ─── File upload ──────────────────────────────────────────
 
@@ -98,69 +104,50 @@ export default function UploadPage() {
 
     setUploading((prev) => new Set(prev).add(itemId));
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${requestId}/${itemId}/${Date.now()}-${safeName}`;
 
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/requests/${requestId}/items/${itemId}/upload`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        }
-      );
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, file, { contentType: file.type, upsert: false });
 
-      if (res.status === 401) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('share_token');
-        navigate(shareToken ? `/request/${shareToken}` : '/');
-        return;
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.message || 'Upload failed. Please try again.');
-        return;
-      }
-
-      const data = await res.json();
-
-      // Update the item in local state with server response
-      setItems((prev) =>
-        prev.map((item) => (item.id === itemId ? { ...item, ...data.item } : item))
-      );
-    } catch {
-      alert('Upload failed. Check your connection and try again.');
-    } finally {
-      setUploading((prev) => {
-        const next = new Set(prev);
-        next.delete(itemId);
-        return next;
-      });
-      // Reset the file input so the same file can be re-selected if needed
-      if (fileInputRefs.current[itemId]) {
-        fileInputRefs.current[itemId].value = '';
-      }
+    if (uploadError) {
+      alert('Upload failed. Please try again.');
+      setUploading((prev) => { const n = new Set(prev); n.delete(itemId); return n; });
+      if (fileInputRefs.current[itemId]) fileInputRefs.current[itemId].value = '';
+      return;
     }
+
+    const currentStatus = items.find((i) => i.id === itemId)?.status;
+    const newStatus = currentStatus === 'pending' ? 'uploaded' : currentStatus;
+
+    const { data: updatedItem, error: updateError } = await supabase
+      .from('request_items')
+      .update({
+        file_path: storagePath,
+        uploaded_at: new Date().toISOString(),
+        status: newStatus,
+      })
+      .eq('id', itemId)
+      .select('id, area, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+      .single();
+
+    if (!updateError && updatedItem) {
+      setItems((prev) => prev.map((i) => (i.id === itemId ? updatedItem : i)));
+    }
+
+    setUploading((prev) => { const n = new Set(prev); n.delete(itemId); return n; });
+    if (fileInputRefs.current[itemId]) fileInputRefs.current[itemId].value = '';
   }
 
   // ─── Render ───────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div style={styles.page}>
-        <p style={{ color: '#888', fontFamily: 'sans-serif' }}>Loading your request…</p>
-      </div>
-    );
+    return <div style={styles.center}><p style={{ color: '#888' }}>Loading your request…</p></div>;
   }
 
   if (error) {
-    return (
-      <div style={styles.page}>
-        <p style={{ color: '#c0392b', fontFamily: 'sans-serif' }}>{error}</p>
-      </div>
-    );
+    return <div style={styles.center}><p style={{ color: '#c0392b' }}>{error}</p></div>;
   }
 
   const completedCount = items.filter((i) => i.status === 'complete').length;
@@ -198,6 +185,7 @@ export default function UploadPage() {
             <table style={styles.table}>
               <thead>
                 <tr>
+                  <th style={styles.th}>Area</th>
                   <th style={styles.th}>Item</th>
                   <th style={styles.th}>Owner</th>
                   <th style={styles.th}>Deadline</th>
@@ -209,15 +197,16 @@ export default function UploadPage() {
               <tbody>
                 {items.map((item) => {
                   const isUploading = uploading.has(item.id);
-                  const overdue = isOverdue(item.deadline) && item.status === 'pending';
+                  const overdue = isOverdue(item.deadline, item.status);
 
                   return (
                     <tr key={item.id} style={styles.tr}>
+                      <td style={{ ...styles.td, color: '#888', fontSize: '13px' }}>
+                        {item.area || '—'}
+                      </td>
                       <td style={styles.td}>
                         <span style={styles.itemName}>{item.item_name}</span>
-                        {item.notes && (
-                          <span style={styles.notes}>{item.notes}</span>
-                        )}
+                        {item.notes && <span style={styles.notes}>{item.notes}</span>}
                       </td>
                       <td style={styles.td}>{item.owner || '—'}</td>
                       <td style={{ ...styles.td, color: overdue ? '#c0392b' : 'inherit' }}>
@@ -230,14 +219,13 @@ export default function UploadPage() {
                       <td style={styles.td}>
                         {item.file_path ? (
                           <span style={styles.fileName}>
-                            {item.file_path.split('/').pop()}
+                            {item.file_path.split('/').pop().replace(/^\d+-/, '')}
                           </span>
                         ) : (
                           <span style={{ color: '#bbb' }}>—</span>
                         )}
                       </td>
                       <td style={{ ...styles.td, textAlign: 'right' }}>
-                        {/* Hidden file input per row */}
                         <input
                           ref={(el) => (fileInputRefs.current[item.id] = el)}
                           type="file"
@@ -252,11 +240,7 @@ export default function UploadPage() {
                           disabled={isUploading}
                           onClick={() => fileInputRefs.current[item.id]?.click()}
                         >
-                          {isUploading
-                            ? 'Uploading…'
-                            : item.file_path
-                            ? 'Replace'
-                            : 'Upload'}
+                          {isUploading ? 'Uploading…' : item.file_path ? 'Replace' : 'Upload'}
                         </button>
                       </td>
                     </tr>
@@ -278,10 +262,15 @@ const styles = {
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
     padding: '40px 24px',
-    fontFamily: 'sans-serif',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-start',
+  },
+  center: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   container: {
     width: '100%',
