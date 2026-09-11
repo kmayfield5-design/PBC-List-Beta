@@ -137,7 +137,7 @@ export default function DashboardPage() {
         ) : requests.length === 0 ? (
           <div style={styles.emptyState}>
             <p style={styles.muted}>
-              {filter === 'mine' ? 'You haven't created any requests yet.' : 'No requests found.'}
+              {filter === 'mine' ? "You haven't created any requests yet." : 'No requests found.'}
             </p>
             <button style={styles.newBtn} onClick={() => navigate('/dashboard/new')}>
               Create your first request
