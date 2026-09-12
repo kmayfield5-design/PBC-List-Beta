@@ -196,7 +196,7 @@ router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
   const { page, limit, offset } = parsePagination(req.query);
 
   // ── 3a. CSV export (bypasses pagination) ──────────────────────
-  if (req.query.export === 'csv') {
+  if (req.query.export === 'csv') { try {
     const { data: exportRows, error: exportError } = await applyFilters(
       supabase
         .from('request_items_enriched')
@@ -226,12 +226,12 @@ router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
     );
 
     // CSV helpers
-    function csvCell(val) {
+    const csvCell = (val) => {
       if (val == null) return '';
       const str = String(val);
       const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
       return /[,"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-    }
+    };
 
     const CSV_HEADERS = [
       'ref_code', 'item_name', 'description', 'area', 'workstream', 'period',
@@ -282,9 +282,12 @@ router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    // BOM so Excel opens UTF-8 without the encoding dialog
+    // BOM prefix so Excel opens UTF-8 without the encoding dialog
     return res.send('﻿' + lines.join('\r\n'));
-  }
+  } catch (csvErr) {
+    console.error('CSV export failed:', csvErr.message);
+    return res.status(500).json({ success: false, message: 'Failed to export items.' });
+  } }
 
   // ── 4. Main paginated query ───────────────────────────────────
   const baseBuilder = () =>

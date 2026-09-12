@@ -58,30 +58,33 @@ export default function RequestDetailPage() {
   useEffect(() => {
     async function fetchRequest() {
       setRequestLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setRequestError('Not signed in.');
+          return;
+        }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setRequestError('Not signed in.');
+        setCurrentUserId(session.user.id);
+
+        const res = await fetch(`${API_BASE}/api/requests/${requestId}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+
+        if (!res.ok) {
+          setRequestError('Request not found.');
+          return;
+        }
+
+        const body = await res.json();
+        setRequest(body.request);
+        setVocabulary(body.vocabulary ?? {});
+      } catch (err) {
+        console.error('fetchRequest failed:', err);
+        setRequestError('Failed to load request. Please refresh.');
+      } finally {
         setRequestLoading(false);
-        return;
       }
-
-      setCurrentUserId(session.user.id);
-
-      const res = await fetch(`${API_BASE}/api/requests/${requestId}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (!res.ok) {
-        setRequestError('Request not found.');
-        setRequestLoading(false);
-        return;
-      }
-
-      const body = await res.json();
-      setRequest(body.request);
-      setVocabulary(body.vocabulary ?? {});
-      setRequestLoading(false);
     }
 
     fetchRequest();
