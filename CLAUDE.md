@@ -28,6 +28,7 @@ env var (`VITE_SUPABASE_STORAGE_BUCKET`) before the infrastructure migration.
 | react-dom | 18.3.1 | DOM renderer |
 | react-router-dom | 6.26.1 | Client-side routing (SPA) |
 | @supabase/supabase-js | 2.45.0 | Auth, database, and storage client |
+| lucide-react | ^0.441.0 | SVG icon library — use for expand/collapse chevrons and any new icons |
 | xlsx | 0.18.5 | Excel template export and import |
 | vite | 5.4.1 | Build tool and dev server |
 
@@ -284,10 +285,26 @@ style={{ color: '#071739', backgroundColor: '#fafbfc' }}
 
 ### Icons
 
-There is no icon library. UI controls use Unicode characters as icon substitutes:
-`←` `→` `↓` `↑` `✓` `✎` `×` `✕`. Do not add an emoji or a character not in this set
-without discussion — status is always conveyed by a text label; the symbol is secondary
-reinforcement only.
+Two icon systems are used together — keep them consistent:
+
+**Unicode icons (inline with text):** `←` `→` `↓` `↑` `✓` `✎` `×` `✕`
+These appear inside button labels and table cells alongside text. They need no import.
+
+**lucide-react (SVG components):** Used for expand/collapse chevrons and any new icons
+that need a precise shape from the mapping below. Import named exports:
+```js
+import { ChevronDown, ChevronRight } from 'lucide-react';
+```
+Icon rules:
+- 16px when inline with text, 20px max for standalone controls.
+- Color via `currentColor` only — never hardcode an icon color.
+- Decorative icons get `aria-hidden={true}`. Icon-only buttons get `aria-label`.
+- Every status and table-row action pairs its icon with a visible text label or
+  accessible name — an icon never carries meaning alone.
+
+**Emoji are banned.** The `no-emoji` Vite plugin (`vite.config.js`) fails `vite build`
+if any file under `src/` (except test files) contains a character in U+1F300-U+1FAFF,
+U+2600-U+26FF, or U+FE0F. Use a lucide-react icon or an approved Unicode icon instead.
 
 ### Copy and labels
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 // ─── Static option sets ───────────────────────────────────────────────
 
@@ -304,7 +305,7 @@ export function FilterPanel({
             style={s.mobileTriggerBtn}
           >
             Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-            <span aria-hidden="true" style={{ marginLeft: '5px' }}>▾</span>
+            <ChevronDown size={16} aria-hidden={true} style={{ marginLeft: '4px', verticalAlign: 'text-bottom' }} />
           </button>
           <span style={s.countText}>
             {countLabel}

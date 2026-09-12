@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 // ─── Static config ────────────────────────────────────────────────────
 
@@ -567,7 +568,9 @@ export function ItemsTable({
                         aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${item.item_name}`}
                         style={{ ...s.iconBtn, color: isExpanded ? '#1d6b6a' : '#6b7d94' }}
                       >
-                        {isExpanded ? '▾' : '▸'}
+                        {isExpanded
+                          ? <ChevronDown size={16} aria-hidden={true} />
+                          : <ChevronRight size={16} aria-hidden={true} />}
                       </button>
                     </td>
                   </tr>
