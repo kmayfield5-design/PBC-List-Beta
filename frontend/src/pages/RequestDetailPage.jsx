@@ -3,31 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import Header from '../components/Header.jsx';
 import { FilterPanel } from '../components/FilterPanel.jsx';
+import { ItemsTable } from '../components/ItemsTable.jsx';
 import { useItemFilters } from '../hooks/useItemFilters.js';
 import { useItemsList } from '../hooks/useItemsList.js';
 
 const STORAGE_BUCKET = 'pbc-uploads';
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
-
-const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'needs_revision', 'complete', 'not_applicable'];
-
-const STATUS_LABELS = {
-  pending:        'Pending',
-  uploaded:       'Uploaded',
-  reviewed:       'Reviewed',
-  needs_revision: 'Needs revision',
-  complete:       'Complete',
-  not_applicable: 'N/A',
-};
-
-const STATUS_STYLES = {
-  pending:        { bg: '#f0f1f5', color: '#6b7d94' },
-  uploaded:       { bg: '#dbeafe', color: '#2563eb' },
-  reviewed:       { bg: '#fef3c7', color: '#d97706' },
-  needs_revision: { bg: '#fde8e8', color: '#c0392b' },
-  complete:       { bg: '#d1fae5', color: '#059669' },
-  not_applicable: { bg: '#f0f1f5', color: '#6b7d94' },
-};
 
 const REQUEST_STATUS_OPTIONS = ['active', 'completed', 'archived'];
 const REQUEST_STATUS_STYLES = {
@@ -41,16 +22,6 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
-}
-
-function groupByArea(items) {
-  const map = new Map();
-  for (const item of items) {
-    const key = item.area?.trim() || '—';
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(item);
-  }
-  return map;
 }
 
 export default function RequestDetailPage() {
@@ -79,18 +50,8 @@ export default function RequestDetailPage() {
     }
   }, [itemsLoading, activeFilterCount, total]);
 
-  // Inline-edit / mutation UI state
-  const [updatingId, setUpdatingId]               = useState(null);
-  const [downloadingId, setDownloadingId]         = useState(null);
-  const [deletingId, setDeletingId]               = useState(null);
   const [copiedLink, setCopiedLink]               = useState(false);
   const [requestStatusUpdating, setRequestStatusUpdating] = useState(false);
-  const [showAddForm, setShowAddForm]             = useState(false);
-  const [addForm, setAddForm]                     = useState({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
-  const [addLoading, setAddLoading]               = useState(false);
-  const [editingId, setEditingId]                 = useState(null);
-  const [editForm, setEditForm]                   = useState({});
-  const [editLoading, setEditLoading]             = useState(false);
 
   // ─── Fetch request metadata + vocabulary ──────────────────────────
 
@@ -129,14 +90,12 @@ export default function RequestDetailPage() {
   // ─── Item status update ───────────────────────────────────────────
 
   async function handleItemStatusChange(itemId, newStatus) {
-    setUpdatingId(itemId);
     const { error } = await supabase
       .from('request_items')
       .update({ status: newStatus })
       .eq('id', itemId);
     if (error) console.error('Status update failed:', error.message);
     else await refresh();
-    setUpdatingId(null);
   }
 
   // ─── Request status update ────────────────────────────────────────
@@ -156,7 +115,6 @@ export default function RequestDetailPage() {
 
   async function handleDownload(item) {
     if (!item.file_path) return;
-    setDownloadingId(item.id);
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
       .createSignedUrl(item.file_path, 120);
@@ -165,82 +123,46 @@ export default function RequestDetailPage() {
     } else {
       window.open(data.signedUrl, '_blank');
     }
-    setDownloadingId(null);
   }
 
   // ─── Edit item ────────────────────────────────────────────────────
 
-  function handleEditStart(item) {
-    setEditingId(item.id);
-    setEditForm({
-      area:          item.area || '',
-      item_name:     item.item_name || '',
-      contact_email: item.contact_email || '',
-      owner:         item.owner || '',
-      deadline:      item.deadline || '',
-    });
-  }
-
-  async function handleEditSave(itemId) {
-    setEditLoading(true);
+  async function handleEditSave(itemId, formData) {
     const { error } = await supabase
       .from('request_items')
-      .update({
-        area:          editForm.area.trim() || null,
-        item_name:     editForm.item_name.trim(),
-        contact_email: editForm.contact_email.trim().toLowerCase(),
-        owner:         editForm.owner.trim() || null,
-        deadline:      editForm.deadline || null,
-      })
+      .update(formData)
       .eq('id', itemId);
-    if (!error) {
-      setEditingId(null);
-      await refresh();
-    } else {
-      console.error('Edit save failed:', error?.message);
+    if (error) {
+      console.error('Edit save failed:', error.message);
+      return error.message;
     }
-    setEditLoading(false);
+    await refresh();
+    return null;
   }
 
   // ─── Delete item ──────────────────────────────────────────────────
 
   async function handleDeleteItem(itemId) {
-    if (!window.confirm('Remove this item from the request?')) return;
-    setDeletingId(itemId);
     const { error } = await supabase
       .from('request_items')
       .delete()
       .eq('id', itemId);
     if (error) console.error('Delete failed:', error.message);
     else await refresh();
-    setDeletingId(null);
   }
 
   // ─── Add item ─────────────────────────────────────────────────────
 
-  async function handleAddItem(e) {
-    e.preventDefault();
-    if (!addForm.item_name.trim() || !addForm.contact_email.trim()) return;
-    setAddLoading(true);
+  async function handleAddSubmit(formData) {
     const { error } = await supabase
       .from('request_items')
-      .insert({
-        request_id:    requestId,
-        area:          addForm.area.trim() || null,
-        item_name:     addForm.item_name.trim(),
-        contact_email: addForm.contact_email.trim().toLowerCase(),
-        deadline:      addForm.deadline || null,
-        owner:         addForm.owner.trim() || null,
-        status:        'pending',
-      });
-    if (!error) {
-      setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
-      setShowAddForm(false);
-      await refresh();
-    } else {
-      console.error('Add item failed:', error?.message);
+      .insert({ request_id: requestId, ...formData, status: 'pending' });
+    if (error) {
+      console.error('Add item failed:', error.message);
+      return error.message;
     }
-    setAddLoading(false);
+    await refresh();
+    return null;
   }
 
   // ─── Share link ───────────────────────────────────────────────────
@@ -252,12 +174,11 @@ export default function RequestDetailPage() {
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  // ─── Derived stats (from current page of items) ───────────────────
+  // ─── Derived stats ────────────────────────────────────────────────
 
-  const itemCount     = items.length;
   const completeCount = items.filter((i) => i.status === 'complete').length;
   const uploadedCount = items.filter((i) => i.status === 'uploaded').length;
-  const pct = itemCount ? Math.round((completeCount / itemCount) * 100) : 0;
+  const pct = total ? Math.round((completeCount / total) * 100) : 0;
 
   // ─── Render ───────────────────────────────────────────────────────
 
@@ -269,7 +190,6 @@ export default function RequestDetailPage() {
     return <div style={styles.center}><p style={{ color: '#c0392b' }}>{requestError}</p></div>;
   }
 
-  const grouped   = groupByArea(items);
   const reqStatus = REQUEST_STATUS_STYLES[request.status] || REQUEST_STATUS_STYLES.active;
 
   return (
@@ -314,7 +234,7 @@ export default function RequestDetailPage() {
               <div style={{ ...styles.progressFill, width: `${pct}%` }} />
             </div>
             <span style={styles.progressLabel}>
-              {completeCount}/{itemCount} complete
+              {completeCount}/{total} complete
               {uploadedCount > 0 && ` · ${uploadedCount} awaiting review`}
             </span>
           </div>
@@ -338,220 +258,26 @@ export default function RequestDetailPage() {
           loading={itemsLoading}
         />
 
+        {/* Items error */}
+        {itemsError && (
+          <p style={{ padding: '12px 0', color: '#b91c1c', margin: 0, fontSize: '13px' }}>{itemsError}</p>
+        )}
+
         {/* Items table */}
-        <div style={{ ...styles.tableCard, opacity: itemsLoading && items.length === 0 ? 0.5 : 1 }}>
-          {itemsError && (
-            <p style={{ padding: '16px', color: '#c0392b', margin: 0 }}>{itemsError}</p>
-          )}
-          {!itemsError && items.length === 0 && !itemsLoading && (
-            <p style={{ padding: '24px 16px', color: '#6b7d94', margin: 0, textAlign: 'center' }}>
-              No items match the current filters.
-            </p>
-          )}
-          {items.length > 0 && (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Item</th>
-                  <th style={styles.th}>Contact</th>
-                  <th style={styles.th}>Owner</th>
-                  <th style={styles.th}>Deadline</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>File</th>
-                  <th style={styles.th}>Uploaded</th>
-                  <th style={styles.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from(grouped.entries()).map(([area, areaItems]) => (
-                  <>
-                    <tr key={`area-${area}`}>
-                      <td colSpan={8} style={styles.areaHeader}>{area}</td>
-                    </tr>
-                    {areaItems.map((item) => {
-                      const isEditing = editingId === item.id;
-                      const overdue   = item.is_overdue ?? (
-                        item.deadline && item.status !== 'complete' && item.status !== 'not_applicable'
-                          ? new Date(item.deadline) < new Date()
-                          : false
-                      );
-                      const ss = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
-
-                      if (isEditing) {
-                        return (
-                          <tr key={item.id} style={{ ...styles.tr, backgroundColor: '#f5f6fa' }}>
-                            <td style={styles.td}>
-                              <input
-                                style={styles.editInput}
-                                placeholder="Item name"
-                                value={editForm.item_name}
-                                onChange={(e) => setEditForm((f) => ({ ...f, item_name: e.target.value }))}
-                              />
-                              <input
-                                style={{ ...styles.editInput, marginTop: '4px', fontSize: '12px' }}
-                                placeholder="Area"
-                                value={editForm.area}
-                                onChange={(e) => setEditForm((f) => ({ ...f, area: e.target.value }))}
-                              />
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                style={styles.editInput}
-                                placeholder="Contact email"
-                                type="email"
-                                value={editForm.contact_email}
-                                onChange={(e) => setEditForm((f) => ({ ...f, contact_email: e.target.value }))}
-                              />
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                style={styles.editInput}
-                                placeholder="Owner"
-                                value={editForm.owner}
-                                onChange={(e) => setEditForm((f) => ({ ...f, owner: e.target.value }))}
-                              />
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                style={styles.editInput}
-                                type="date"
-                                value={editForm.deadline}
-                                onChange={(e) => setEditForm((f) => ({ ...f, deadline: e.target.value }))}
-                              />
-                            </td>
-                            <td style={styles.td} colSpan={3}>
-                              <span style={{ fontSize: '12px', color: '#6b7d94' }}>Status & file unchanged</span>
-                            </td>
-                            <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
-                              <button style={styles.editSaveBtn} onClick={() => handleEditSave(item.id)} disabled={editLoading}>
-                                {editLoading ? '…' : 'Save'}
-                              </button>
-                              <button style={styles.editCancelBtn} onClick={() => setEditingId(null)} disabled={editLoading}>
-                                Cancel
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      }
-
-                      return (
-                        <tr key={item.id} style={styles.tr}>
-                          <td style={styles.td}>
-                            <span style={styles.itemName}>{item.item_name}</span>
-                            {item.ref_code && <span style={styles.refCode}>{item.ref_code}</span>}
-                            {item.notes && <span style={styles.notes}>{item.notes}</span>}
-                          </td>
-                          <td style={styles.td}>
-                            <span style={styles.contactEmail}>{item.contact_email}</span>
-                          </td>
-                          <td style={styles.td}>{item.owner || '—'}</td>
-                          <td style={{ ...styles.td, color: overdue ? '#c0392b' : '#071739' }}>
-                            {formatDate(item.deadline)}
-                            {overdue && <span style={styles.overdueTag}>Overdue</span>}
-                          </td>
-                          <td style={styles.td}>
-                            <select
-                              value={item.status}
-                              onChange={(e) => handleItemStatusChange(item.id, e.target.value)}
-                              disabled={updatingId === item.id}
-                              style={{ ...styles.itemStatusSelect, backgroundColor: ss.bg, color: ss.color }}
-                            >
-                              {STATUS_OPTIONS.map((o) => (
-                                <option key={o} value={o}>{STATUS_LABELS[o] ?? o}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={styles.td}>
-                            {item.file_path ? (
-                              <button
-                                style={styles.downloadBtn}
-                                onClick={() => handleDownload(item)}
-                                disabled={downloadingId === item.id}
-                              >
-                                {downloadingId === item.id ? '…' : '↓ Download'}
-                              </button>
-                            ) : (
-                              <span style={{ color: '#dadde6' }}>—</span>
-                            )}
-                          </td>
-                          <td style={{ ...styles.td, fontSize: '12px', color: '#6b7d94' }}>
-                            {item.uploaded_at ? formatDate(item.uploaded_at) : '—'}
-                          </td>
-                          <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
-                            <button style={styles.editIconBtn} onClick={() => handleEditStart(item)} title="Edit item">✎</button>
-                            <button
-                              style={styles.deleteBtn}
-                              onClick={() => handleDeleteItem(item.id)}
-                              disabled={deletingId === item.id}
-                              title="Remove item"
-                            >
-                              {deletingId === item.id ? '…' : '×'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* Add item form */}
-          {showAddForm ? (
-            <form onSubmit={handleAddItem} style={styles.addForm}>
-              <input
-                style={styles.addInput}
-                placeholder="Area"
-                value={addForm.area}
-                onChange={(e) => setAddForm((f) => ({ ...f, area: e.target.value }))}
-              />
-              <input
-                style={{ ...styles.addInput, flex: 2 }}
-                placeholder="Item name *"
-                required
-                value={addForm.item_name}
-                onChange={(e) => setAddForm((f) => ({ ...f, item_name: e.target.value }))}
-              />
-              <input
-                style={{ ...styles.addInput, flex: 2 }}
-                placeholder="Contact email *"
-                type="email"
-                required
-                value={addForm.contact_email}
-                onChange={(e) => setAddForm((f) => ({ ...f, contact_email: e.target.value }))}
-              />
-              <input
-                style={styles.addInput}
-                placeholder="Owner"
-                value={addForm.owner}
-                onChange={(e) => setAddForm((f) => ({ ...f, owner: e.target.value }))}
-              />
-              <input
-                style={styles.addInput}
-                type="date"
-                value={addForm.deadline}
-                onChange={(e) => setAddForm((f) => ({ ...f, deadline: e.target.value }))}
-              />
-              <button type="submit" style={styles.addSaveBtn} disabled={addLoading}>
-                {addLoading ? 'Saving…' : 'Add'}
-              </button>
-              <button
-                type="button"
-                style={styles.addCancelBtn}
-                onClick={() => {
-                  setShowAddForm(false);
-                  setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
-                }}
-              >
-                Cancel
-              </button>
-            </form>
-          ) : (
-            <div style={styles.addRow}>
-              <button style={styles.addBtn} onClick={() => setShowAddForm(true)}>+ Add item</button>
-            </div>
-          )}
+        <div style={{ opacity: itemsLoading && items.length === 0 ? 0.5 : 1, transition: 'opacity 0.15s' }}>
+          <ItemsTable
+            items={items}
+            sort={filters.sort ?? ''}
+            setSort={(val) => set('sort', val)}
+            clearAll={clearAll}
+            activeFilterCount={activeFilterCount}
+            currentUserId={currentUserId}
+            onStatusChange={handleItemStatusChange}
+            onEditSave={handleEditSave}
+            onDelete={handleDeleteItem}
+            onDownload={handleDownload}
+            onAddSubmit={handleAddSubmit}
+          />
         </div>
       </div>
     </div>
@@ -607,91 +333,4 @@ const styles = {
     height: '100%', backgroundColor: '#379190', borderRadius: '99px', transition: 'width 0.3s ease',
   },
   progressLabel: { fontSize: '13px', color: '#6b7d94', whiteSpace: 'nowrap' },
-  tableCard: {
-    backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #dadde6',
-    boxShadow: '0 1px 4px rgba(7,23,57,0.06)', overflow: 'hidden', transition: 'opacity 0.15s',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    padding: '12px 16px', fontSize: '11px', fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em',
-    color: '#6b7d94', textAlign: 'left', borderBottom: '1px solid #dadde6',
-    backgroundColor: '#fafbfc', whiteSpace: 'nowrap',
-  },
-  areaHeader: {
-    padding: '10px 16px', fontSize: '11px', fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase', letterSpacing: '0.07em',
-    color: '#4c6382', backgroundColor: '#fafbfc',
-    borderTop: '1px solid #dadde6', borderBottom: '1px solid #dadde6',
-  },
-  tr: { borderBottom: '1px solid #f0f1f5' },
-  td: { padding: '13px 16px', fontSize: '14px', color: '#071739', verticalAlign: 'top' },
-  itemName: { display: 'block', fontWeight: '500' },
-  refCode: {
-    display: 'block', fontSize: '11px', color: '#6b7d94', marginTop: '2px',
-    fontFamily: 'Arial, Helvetica, sans-serif', letterSpacing: '0.04em',
-  },
-  notes: { display: 'block', fontSize: '12px', color: '#6b7d94', marginTop: '2px' },
-  contactEmail: { fontSize: '13px', color: '#4c6382' },
-  overdueTag: {
-    display: 'inline-block', marginLeft: '6px', fontSize: '10px', fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif', textTransform: 'uppercase',
-    color: '#c0392b', backgroundColor: '#fde8e8', padding: '1px 5px', borderRadius: '4px',
-  },
-  itemStatusSelect: {
-    padding: '4px 8px', fontSize: '12px', fontWeight: '600',
-    fontFamily: 'Arial, Helvetica, sans-serif', border: 'none', borderRadius: '99px',
-    cursor: 'pointer', outline: 'none',
-  },
-  downloadBtn: {
-    padding: '4px 10px', fontSize: '12px', fontWeight: '500',
-    fontFamily: 'Arial, Helvetica, sans-serif', color: '#2563eb', backgroundColor: '#dbeafe',
-    border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
-  },
-  deleteBtn: {
-    background: 'none', border: 'none', color: '#6b7d94', fontSize: '18px',
-    lineHeight: 1, cursor: 'pointer', padding: '0 4px', borderRadius: '4px',
-  },
-  editIconBtn: {
-    background: 'none', border: 'none', color: '#6b7d94', fontSize: '15px',
-    lineHeight: 1, cursor: 'pointer', padding: '0 4px', borderRadius: '4px', marginRight: '2px',
-  },
-  editInput: {
-    display: 'block', width: '100%', padding: '5px 8px', fontSize: '13px',
-    border: '1.5px solid #dadde6', borderRadius: '6px', outline: 'none',
-    color: '#071739', backgroundColor: '#fff',
-  },
-  editSaveBtn: {
-    padding: '5px 12px', fontSize: '12px', fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif', color: '#fff', backgroundColor: '#379190',
-    border: 'none', borderRadius: '6px', cursor: 'pointer', marginRight: '6px',
-  },
-  editCancelBtn: {
-    padding: '5px 10px', fontSize: '12px', fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
-    borderRadius: '6px', cursor: 'pointer',
-  },
-  addRow: { padding: '12px 16px', borderTop: '1px solid #dadde6' },
-  addBtn: {
-    background: 'none', border: 'none', color: '#4c6382', fontSize: '13px', fontWeight: '600',
-    fontFamily: 'Arial, Helvetica, sans-serif', cursor: 'pointer', padding: '4px 0',
-  },
-  addForm: {
-    display: 'flex', gap: '8px', alignItems: 'center',
-    padding: '12px 16px', borderTop: '1px solid #dadde6', flexWrap: 'wrap',
-  },
-  addInput: {
-    flex: 1, minWidth: '100px', padding: '7px 10px', fontSize: '13px',
-    border: '1.5px solid #dadde6', borderRadius: '6px', outline: 'none', color: '#071739',
-  },
-  addSaveBtn: {
-    padding: '7px 16px', fontSize: '13px', fontWeight: '700',
-    fontFamily: 'Arial, Helvetica, sans-serif', color: '#fff', backgroundColor: '#379190',
-    border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
-  },
-  addCancelBtn: {
-    padding: '7px 12px', fontSize: '13px', fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
-    borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
-  },
 };

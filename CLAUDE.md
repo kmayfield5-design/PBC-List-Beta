@@ -163,6 +163,12 @@ PBC-List-Beta/
         FilterPanel.jsx       # Faceted filter UI: chips (area/status/priority/req-by), date range, search.
                               #   Desktop: inline card. Mobile (<768 px): "Filters (N)" → bottom sheet.
                               #   All colors use CSS custom properties; dark mode via @media prefers-color-scheme.
+        ItemsTable.jsx        # Items table with sortable headers, expandable detail row, inline edit,
+                              #   add form, and status badge. All table/form state is internal.
+                              #   Columns: Ref, Item, Area, Requested by, Period, Due, Aging, Status.
+                              #   Expanded detail: left (description/period/format/sensitivity/blocked),
+                              #   right (requested_by/reviewer/uploaded/reviewed/revision/reminders),
+                              #   footer (review_notes + download). One row expands at a time (local state).
       pages/
         AdvisorLoginPage.jsx  # /  — advisor sign-in (password or magic link)
         AuthCallbackPage.jsx  # /auth/callback — Supabase magic link landing
