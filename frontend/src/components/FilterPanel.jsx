@@ -254,7 +254,23 @@ export function FilterPanel({
   grandTotal,
   currentUserId,
   loading,
+  onExport,
 }) {
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExportClick() {
+    setExporting(true);
+    try {
+      await onExport?.();
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const exportLabel = exporting
+    ? 'Exporting…'
+    : `Export ${total.toLocaleString()} item${total !== 1 ? 's' : ''}`;
+
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined'
       ? window.matchMedia('(max-width: 767px)').matches
@@ -307,6 +323,16 @@ export function FilterPanel({
             Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             <ChevronDown size={16} aria-hidden={true} style={{ marginLeft: '4px', verticalAlign: 'text-bottom' }} />
           </button>
+          {onExport && (
+            <button
+              type="button"
+              onClick={handleExportClick}
+              disabled={exporting}
+              style={s.exportBtn}
+            >
+              {exportLabel}
+            </button>
+          )}
           <span style={s.countText}>
             {countLabel}
             {loading && <span style={s.updatingHint}> · Updating…</span>}
@@ -361,11 +387,23 @@ export function FilterPanel({
           {countLabel}
           {loading && <span style={s.updatingHint}> · Updating…</span>}
         </span>
-        {activeFilterCount > 0 && (
-          <button type="button" onClick={clearAll} style={s.clearAllBtn}>
-            Clear all
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {activeFilterCount > 0 && (
+            <button type="button" onClick={clearAll} style={s.clearAllBtn}>
+              Clear all
+            </button>
+          )}
+          {onExport && (
+            <button
+              type="button"
+              onClick={handleExportClick}
+              disabled={exporting}
+              style={s.exportBtn}
+            >
+              {exportLabel}
+            </button>
+          )}
+        </div>
       </div>
       <FilterContent {...contentProps} />
     </div>
@@ -409,6 +447,18 @@ const s = {
     border: '1px solid var(--color-line)',
     borderRadius: '6px',
     cursor: 'pointer',
+  },
+  exportBtn: {
+    padding: '4px 10px',
+    fontSize: '12px',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontWeight: '600',
+    color: 'var(--color-teal, #379190)',
+    backgroundColor: 'transparent',
+    border: '1px solid var(--color-teal, #379190)',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
 
   // Filter content rows

@@ -182,7 +182,7 @@ router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
   // ── 2. Authorization: request must belong to this advisor ──────
   const { data: request, error: reqError } = await supabase
     .from('requests')
-    .select('id')
+    .select('id, project_name')
     .eq('id', requestId)
     .eq('created_by', advisorId)
     .single();
@@ -194,6 +194,97 @@ router.get('/:requestId/items', verifyAdvisorJWT, async (req, res) => {
   // ── 3. Parse filters and pagination ───────────────────────────
   const filters = parseFilters(req.query);
   const { page, limit, offset } = parsePagination(req.query);
+
+  // ── 3a. CSV export (bypasses pagination) ──────────────────────
+  if (req.query.export === 'csv') {
+    const { data: exportRows, error: exportError } = await applyFilters(
+      supabase
+        .from('request_items_enriched')
+        .eq('request_id', requestId),
+      filters
+    )
+      .select('*')
+      .order(sort.field, { ascending: sort.ascending, nullsFirst: sort.nullsFirst });
+
+    if (exportError) {
+      console.error('CSV export fetch failed:', exportError.message);
+      return res.status(500).json({ success: false, message: 'Failed to export items.' });
+    }
+
+    const rows = exportRows ?? [];
+
+    // Resolve advisor UIDs → email addresses
+    const uids = new Set(
+      rows.flatMap((r) => [r.requested_by, r.reviewer].filter(Boolean))
+    );
+    const emailMap = {};
+    await Promise.all(
+      Array.from(uids).map(async (uid) => {
+        const { data } = await supabase.auth.admin.getUserById(uid);
+        emailMap[uid] = data?.user?.email ?? uid;
+      })
+    );
+
+    // CSV helpers
+    function csvCell(val) {
+      if (val == null) return '';
+      const str = String(val);
+      const safe = /^[=+\-@]/.test(str) ? `'${str}` : str;
+      return /[,"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    }
+
+    const CSV_HEADERS = [
+      'ref_code', 'item_name', 'description', 'area', 'workstream', 'period',
+      'contact_email', 'requested_by', 'reviewer', 'priority', 'due_date',
+      'status', 'uploaded_at', 'reviewed_at', 'days_overdue', 'days_outstanding',
+      'revision_round', 'review_notes',
+    ];
+
+    const lines = [CSV_HEADERS.join(',')];
+    for (const item of rows) {
+      lines.push([
+        item.ref_code,
+        item.item_name,
+        item.description,
+        item.area,
+        item.workstream,
+        item.period,
+        item.contact_email,
+        emailMap[item.requested_by] ?? item.requested_by,
+        emailMap[item.reviewer] ?? item.reviewer,
+        item.priority,
+        item.deadline,
+        item.status,
+        item.uploaded_at,
+        item.reviewed_at,
+        item.days_overdue,
+        item.days_outstanding,
+        item.revision_round,
+        item.review_notes,
+      ].map(csvCell).join(','));
+    }
+
+    // Sanitize filename — collapse runs of underscores, strip leading/trailing
+    const date = new Date().toISOString().slice(0, 10);
+    const safeName = (request.project_name ?? 'project')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 60) || 'project';
+    const filename = `${safeName}_data_requests_${date}.csv`;
+
+    await insertAuditLog({
+      action: 'items_exported',
+      actor: req.advisor.email,
+      request_id: requestId,
+      details: { filters, row_count: rows.length, filename },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    // BOM so Excel opens UTF-8 without the encoding dialog
+    return res.send('﻿' + lines.join('\r\n'));
+  }
 
   // ── 4. Main paginated query ───────────────────────────────────
   const baseBuilder = () =>

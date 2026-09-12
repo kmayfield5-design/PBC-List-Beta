@@ -165,6 +165,38 @@ export default function RequestDetailPage() {
     return null;
   }
 
+  // ─── CSV export ───────────────────────────────────────────────────
+
+  async function handleExport() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const qs = queryString ? `${queryString}&export=csv` : 'export=csv';
+    try {
+      const res = await fetch(`${API_BASE}/api/requests/${requestId}/items?${qs}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        alert('Export failed. Please try again.');
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') ?? '';
+      const match = cd.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? 'export.csv';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
+    }
+  }
+
   // ─── Share link ───────────────────────────────────────────────────
 
   function copyShareLink() {
@@ -256,6 +288,7 @@ export default function RequestDetailPage() {
           grandTotal={grandTotalRef.current}
           currentUserId={currentUserId}
           loading={itemsLoading}
+          onExport={handleExport}
         />
 
         {/* Items error */}
