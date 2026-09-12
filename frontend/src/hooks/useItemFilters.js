@@ -71,6 +71,18 @@ export function useItemFilters() {
     }, { replace: true });
   }, [setSearchParams]);
 
+  // Set multiple scalar fields atomically in a single history replace
+  const setMultiple = useCallback((updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [field, value] of Object.entries(updates)) {
+        if (value == null || value === '') next.delete(field);
+        else next.set(field, String(value));
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const clearAll = useCallback(() => {
     setSearchText('');
     setSearchParams(new URLSearchParams(), { replace: true });
@@ -83,6 +95,7 @@ export function useItemFilters() {
     setSearchText,
     toggle,
     set,
+    setMultiple,
     clearAll,
     activeFilterCount: countActive(searchParams),
   };

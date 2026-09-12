@@ -1,3 +1,59 @@
+/* ─── Design token custom properties ──────────────────────────────── */
+:root {
+  --color-ink:            #071739;
+  --color-body:           #4c6382;
+  --color-muted:          #6b7d94;
+  --color-line:           #dadde6;
+  --color-surface:        #ffffff;
+  --color-canvas:         #fafbfc;
+  --color-accent:         #379190;
+  --color-accent-soft:    #e4f4f4;
+  --color-accent-text:    #1d6b6a;
+  --color-warn:           #c0392b;
+  --color-warn-soft:      #fde8e8;
+
+  /* Chip states */
+  --chip-bg:              var(--color-surface);
+  --chip-color:           var(--color-body);
+  --chip-border:          var(--color-line);
+  --chip-selected-bg:     var(--color-accent-soft);
+  --chip-selected-color:  var(--color-accent-text);
+  --chip-selected-border: var(--color-accent);
+  --chip-zero-color:      #b0c0d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink:            #e2eaf5;
+    --color-body:           #a0b5cc;
+    --color-muted:          #6780a0;
+    --color-line:           #243046;
+    --color-surface:        #111d2e;
+    --color-canvas:         #0b1524;
+    --color-accent:         #45b2b1;
+    --color-accent-soft:    #153031;
+    --color-accent-text:    #65d0cf;
+    --color-warn:           #e05555;
+    --color-warn-soft:      #3a1515;
+
+    --chip-bg:              #182338;
+    --chip-color:           #8ba8cc;
+    --chip-border:          #243046;
+    --chip-selected-bg:     var(--color-accent-soft);
+    --chip-selected-color:  var(--color-accent-text);
+    --chip-selected-border: var(--color-accent);
+    --chip-zero-color:      #3a5270;
+  }
+}
+
+/* ─── Filter chip focus ring ───────────────────────────────────────── */
+/* Applied via className="filter-chip" — inline styles cannot target :focus-visible */
+.filter-chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ─── Reset ────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   font-family: Verdana, Geneva, sans-serif;
   box-sizing: border-box;
@@ -6,5 +62,5 @@
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
-  background-color: #fafbfc;
+  background-color: var(--color-canvas);
 }

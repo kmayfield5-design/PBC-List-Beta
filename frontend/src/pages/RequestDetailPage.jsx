@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import Header from '../components/Header.jsx';
+import { FilterPanel } from '../components/FilterPanel.jsx';
 import { useItemFilters } from '../hooks/useItemFilters.js';
 import { useItemsList } from '../hooks/useItemsList.js';
 
 const STORAGE_BUCKET = 'pbc-uploads';
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const STATUS_OPTIONS = ['pending', 'uploaded', 'reviewed', 'needs_revision', 'complete', 'not_applicable'];
 
@@ -55,46 +57,76 @@ export default function RequestDetailPage() {
   const { requestId } = useParams();
   const navigate = useNavigate();
 
-  const { searchText, setSearchText, clearAll, activeFilterCount, queryString } = useItemFilters();
-  const { items, loading: itemsLoading, error: itemsError, refresh } = useItemsList(requestId, queryString);
+  const {
+    filters, queryString, searchText, setSearchText,
+    toggle, set, setMultiple, clearAll, activeFilterCount,
+  } = useItemFilters();
 
-  const [request, setRequest] = useState(null);
+  const { items, total, facets, loading: itemsLoading, error: itemsError, refresh } = useItemsList(requestId, queryString);
+
+  // Request metadata + vocabulary (fetched via backend API so we get vocabulary too)
+  const [request, setRequest]       = useState(null);
+  const [vocabulary, setVocabulary] = useState({});
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [requestLoading, setRequestLoading] = useState(true);
-  const [requestError, setRequestError] = useState('');
-  const [updatingId, setUpdatingId] = useState(null);
-  const [downloadingId, setDownloadingId] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [requestStatusUpdating, setRequestStatusUpdating] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
-  const [addLoading, setAddLoading] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [editLoading, setEditLoading] = useState(false);
+  const [requestError, setRequestError]     = useState('');
 
-  // ─── Fetch request metadata ────────────────────────────────────
+  // Track unfiltered total for "Showing N of M" label
+  const grandTotalRef = useRef(null);
+  useEffect(() => {
+    if (!itemsLoading && activeFilterCount === 0) {
+      grandTotalRef.current = total;
+    }
+  }, [itemsLoading, activeFilterCount, total]);
+
+  // Inline-edit / mutation UI state
+  const [updatingId, setUpdatingId]               = useState(null);
+  const [downloadingId, setDownloadingId]         = useState(null);
+  const [deletingId, setDeletingId]               = useState(null);
+  const [copiedLink, setCopiedLink]               = useState(false);
+  const [requestStatusUpdating, setRequestStatusUpdating] = useState(false);
+  const [showAddForm, setShowAddForm]             = useState(false);
+  const [addForm, setAddForm]                     = useState({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
+  const [addLoading, setAddLoading]               = useState(false);
+  const [editingId, setEditingId]                 = useState(null);
+  const [editForm, setEditForm]                   = useState({});
+  const [editLoading, setEditLoading]             = useState(false);
+
+  // ─── Fetch request metadata + vocabulary ──────────────────────────
 
   useEffect(() => {
     async function fetchRequest() {
       setRequestLoading(true);
-      const { data: req, error: reqErr } = await supabase
-        .from('requests')
-        .select('id, project_name, status, share_token, created_at')
-        .eq('id', requestId)
-        .single();
-      if (reqErr || !req) {
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setRequestError('Not signed in.');
+        setRequestLoading(false);
+        return;
+      }
+
+      setCurrentUserId(session.user.id);
+
+      const res = await fetch(`${API_BASE}/api/requests/${requestId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (!res.ok) {
         setRequestError('Request not found.');
         setRequestLoading(false);
         return;
       }
-      setRequest(req);
+
+      const body = await res.json();
+      setRequest(body.request);
+      setVocabulary(body.vocabulary ?? {});
       setRequestLoading(false);
     }
+
     fetchRequest();
   }, [requestId]);
 
-  // ─── Item status update ───────────────────────────────────────
+  // ─── Item status update ───────────────────────────────────────────
 
   async function handleItemStatusChange(itemId, newStatus) {
     setUpdatingId(itemId);
@@ -107,7 +139,7 @@ export default function RequestDetailPage() {
     setUpdatingId(null);
   }
 
-  // ─── Request status update ────────────────────────────────────
+  // ─── Request status update ────────────────────────────────────────
 
   async function handleRequestStatusChange(newStatus) {
     setRequestStatusUpdating(true);
@@ -120,7 +152,7 @@ export default function RequestDetailPage() {
     setRequestStatusUpdating(false);
   }
 
-  // ─── File download ────────────────────────────────────────────
+  // ─── File download ────────────────────────────────────────────────
 
   async function handleDownload(item) {
     if (!item.file_path) return;
@@ -136,16 +168,16 @@ export default function RequestDetailPage() {
     setDownloadingId(null);
   }
 
-  // ─── Edit item ────────────────────────────────────────────────
+  // ─── Edit item ────────────────────────────────────────────────────
 
   function handleEditStart(item) {
     setEditingId(item.id);
     setEditForm({
-      area: item.area || '',
-      item_name: item.item_name || '',
+      area:          item.area || '',
+      item_name:     item.item_name || '',
       contact_email: item.contact_email || '',
-      owner: item.owner || '',
-      deadline: item.deadline || '',
+      owner:         item.owner || '',
+      deadline:      item.deadline || '',
     });
   }
 
@@ -154,11 +186,11 @@ export default function RequestDetailPage() {
     const { error } = await supabase
       .from('request_items')
       .update({
-        area: editForm.area.trim() || null,
-        item_name: editForm.item_name.trim(),
+        area:          editForm.area.trim() || null,
+        item_name:     editForm.item_name.trim(),
         contact_email: editForm.contact_email.trim().toLowerCase(),
-        owner: editForm.owner.trim() || null,
-        deadline: editForm.deadline || null,
+        owner:         editForm.owner.trim() || null,
+        deadline:      editForm.deadline || null,
       })
       .eq('id', itemId);
     if (!error) {
@@ -170,7 +202,7 @@ export default function RequestDetailPage() {
     setEditLoading(false);
   }
 
-  // ─── Delete item ──────────────────────────────────────────────
+  // ─── Delete item ──────────────────────────────────────────────────
 
   async function handleDeleteItem(itemId) {
     if (!window.confirm('Remove this item from the request?')) return;
@@ -184,7 +216,7 @@ export default function RequestDetailPage() {
     setDeletingId(null);
   }
 
-  // ─── Add item ─────────────────────────────────────────────────
+  // ─── Add item ─────────────────────────────────────────────────────
 
   async function handleAddItem(e) {
     e.preventDefault();
@@ -193,13 +225,13 @@ export default function RequestDetailPage() {
     const { error } = await supabase
       .from('request_items')
       .insert({
-        request_id: requestId,
-        area: addForm.area.trim() || null,
-        item_name: addForm.item_name.trim(),
+        request_id:    requestId,
+        area:          addForm.area.trim() || null,
+        item_name:     addForm.item_name.trim(),
         contact_email: addForm.contact_email.trim().toLowerCase(),
-        deadline: addForm.deadline || null,
-        owner: addForm.owner.trim() || null,
-        status: 'pending',
+        deadline:      addForm.deadline || null,
+        owner:         addForm.owner.trim() || null,
+        status:        'pending',
       });
     if (!error) {
       setAddForm({ area: '', item_name: '', contact_email: '', deadline: '', owner: '' });
@@ -211,23 +243,23 @@ export default function RequestDetailPage() {
     setAddLoading(false);
   }
 
-  // ─── Share link ───────────────────────────────────────────────
+  // ─── Share link ───────────────────────────────────────────────────
 
   function copyShareLink() {
-    if (!request) return;
+    if (!request?.share_token) return;
     navigator.clipboard.writeText(`${window.location.origin}/request/${request.share_token}`);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  // ─── Derived stats ────────────────────────────────────────────
+  // ─── Derived stats (from current page of items) ───────────────────
 
-  const itemCount = items.length;
+  const itemCount     = items.length;
   const completeCount = items.filter((i) => i.status === 'complete').length;
   const uploadedCount = items.filter((i) => i.status === 'uploaded').length;
   const pct = itemCount ? Math.round((completeCount / itemCount) * 100) : 0;
 
-  // ─── Render ───────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────
 
   if (requestLoading) {
     return <div style={styles.center}>Loading…</div>;
@@ -237,7 +269,7 @@ export default function RequestDetailPage() {
     return <div style={styles.center}><p style={{ color: '#c0392b' }}>{requestError}</p></div>;
   }
 
-  const grouped = groupByArea(items);
+  const grouped   = groupByArea(items);
   const reqStatus = REQUEST_STATUS_STYLES[request.status] || REQUEST_STATUS_STYLES.active;
 
   return (
@@ -288,27 +320,23 @@ export default function RequestDetailPage() {
           </div>
         </div>
 
-        {/* Filter bar */}
-        <div style={styles.filterBar}>
-          <input
-            type="search"
-            placeholder="Search items…"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={styles.searchInput}
-          />
-          {activeFilterCount > 0 && (
-            <>
-              <span style={styles.filterCount}>
-                {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active
-              </span>
-              <button style={styles.clearBtn} onClick={clearAll}>Clear all</button>
-            </>
-          )}
-          {itemsLoading && items.length > 0 && (
-            <span style={styles.loadingHint}>Updating…</span>
-          )}
-        </div>
+        {/* Filter panel */}
+        <FilterPanel
+          vocabulary={vocabulary}
+          facets={facets}
+          filters={filters}
+          toggle={toggle}
+          set={set}
+          setMultiple={setMultiple}
+          clearAll={clearAll}
+          searchText={searchText}
+          setSearchText={setSearchText}
+          activeFilterCount={activeFilterCount}
+          total={total}
+          grandTotal={grandTotalRef.current}
+          currentUserId={currentUserId}
+          loading={itemsLoading}
+        />
 
         {/* Items table */}
         <div style={{ ...styles.tableCard, opacity: itemsLoading && items.length === 0 ? 0.5 : 1 }}>
@@ -342,13 +370,12 @@ export default function RequestDetailPage() {
                     </tr>
                     {areaItems.map((item) => {
                       const isEditing = editingId === item.id;
-                      // Prefer the computed is_overdue from the enriched view; fall back to client-side check
-                      const overdue = item.is_overdue ?? (
+                      const overdue   = item.is_overdue ?? (
                         item.deadline && item.status !== 'complete' && item.status !== 'not_applicable'
                           ? new Date(item.deadline) < new Date()
                           : false
                       );
-                      const s = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
+                      const ss = STATUS_STYLES[item.status] || STATUS_STYLES.pending;
 
                       if (isEditing) {
                         return (
@@ -396,18 +423,10 @@ export default function RequestDetailPage() {
                               <span style={{ fontSize: '12px', color: '#6b7d94' }}>Status & file unchanged</span>
                             </td>
                             <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
-                              <button
-                                style={styles.editSaveBtn}
-                                onClick={() => handleEditSave(item.id)}
-                                disabled={editLoading}
-                              >
+                              <button style={styles.editSaveBtn} onClick={() => handleEditSave(item.id)} disabled={editLoading}>
                                 {editLoading ? '…' : 'Save'}
                               </button>
-                              <button
-                                style={styles.editCancelBtn}
-                                onClick={() => setEditingId(null)}
-                                disabled={editLoading}
-                              >
+                              <button style={styles.editCancelBtn} onClick={() => setEditingId(null)} disabled={editLoading}>
                                 Cancel
                               </button>
                             </td>
@@ -419,9 +438,7 @@ export default function RequestDetailPage() {
                         <tr key={item.id} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.itemName}>{item.item_name}</span>
-                            {item.ref_code && (
-                              <span style={styles.refCode}>{item.ref_code}</span>
-                            )}
+                            {item.ref_code && <span style={styles.refCode}>{item.ref_code}</span>}
                             {item.notes && <span style={styles.notes}>{item.notes}</span>}
                           </td>
                           <td style={styles.td}>
@@ -437,7 +454,7 @@ export default function RequestDetailPage() {
                               value={item.status}
                               onChange={(e) => handleItemStatusChange(item.id, e.target.value)}
                               disabled={updatingId === item.id}
-                              style={{ ...styles.itemStatusSelect, backgroundColor: s.bg, color: s.color }}
+                              style={{ ...styles.itemStatusSelect, backgroundColor: ss.bg, color: ss.color }}
                             >
                               {STATUS_OPTIONS.map((o) => (
                                 <option key={o} value={o}>{STATUS_LABELS[o] ?? o}</option>
@@ -461,13 +478,7 @@ export default function RequestDetailPage() {
                             {item.uploaded_at ? formatDate(item.uploaded_at) : '—'}
                           </td>
                           <td style={{ ...styles.td, textAlign: 'right', padding: '13px 12px', whiteSpace: 'nowrap' }}>
-                            <button
-                              style={styles.editIconBtn}
-                              onClick={() => handleEditStart(item)}
-                              title="Edit item"
-                            >
-                              ✎
-                            </button>
+                            <button style={styles.editIconBtn} onClick={() => handleEditStart(item)} title="Edit item">✎</button>
                             <button
                               style={styles.deleteBtn}
                               onClick={() => handleDeleteItem(item.id)}
@@ -538,9 +549,7 @@ export default function RequestDetailPage() {
             </form>
           ) : (
             <div style={styles.addRow}>
-              <button style={styles.addBtn} onClick={() => setShowAddForm(true)}>
-                + Add item
-              </button>
+              <button style={styles.addBtn} onClick={() => setShowAddForm(true)}>+ Add item</button>
             </div>
           )}
         </div>
@@ -549,7 +558,7 @@ export default function RequestDetailPage() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────
 
 const styles = {
   page: { minHeight: '100vh', backgroundColor: '#fafbfc' },
@@ -598,24 +607,6 @@ const styles = {
     height: '100%', backgroundColor: '#379190', borderRadius: '99px', transition: 'width 0.3s ease',
   },
   progressLabel: { fontSize: '13px', color: '#6b7d94', whiteSpace: 'nowrap' },
-  filterBar: {
-    display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap',
-  },
-  searchInput: {
-    flex: '1 1 220px', maxWidth: '360px', padding: '7px 12px', fontSize: '13px',
-    border: '1.5px solid #dadde6', borderRadius: '8px', outline: 'none',
-    color: '#071739', backgroundColor: '#fff', fontFamily: 'Verdana, Geneva, sans-serif',
-  },
-  filterCount: {
-    fontSize: '12px', fontWeight: '600', fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382', whiteSpace: 'nowrap',
-  },
-  clearBtn: {
-    padding: '5px 10px', fontSize: '12px', fontFamily: 'Arial, Helvetica, sans-serif',
-    color: '#4c6382', backgroundColor: 'transparent', border: '1px solid #dadde6',
-    borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap',
-  },
-  loadingHint: { fontSize: '12px', color: '#6b7d94', fontStyle: 'italic' },
   tableCard: {
     backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #dadde6',
     boxShadow: '0 1px 4px rgba(7,23,57,0.06)', overflow: 'hidden', transition: 'opacity 0.15s',

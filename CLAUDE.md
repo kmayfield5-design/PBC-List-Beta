@@ -160,6 +160,9 @@ PBC-List-Beta/
       components/
         Header.jsx            # Sticky top bar: logo, page title slot, right slot
         ProtectedRoute.jsx    # Redirects to / if no Supabase session
+        FilterPanel.jsx       # Faceted filter UI: chips (area/status/priority/req-by), date range, search.
+                              #   Desktop: inline card. Mobile (<768 px): "Filters (N)" → bottom sheet.
+                              #   All colors use CSS custom properties; dark mode via @media prefers-color-scheme.
       pages/
         AdvisorLoginPage.jsx  # /  — advisor sign-in (password or magic link)
         AuthCallbackPage.jsx  # /auth/callback — Supabase magic link landing

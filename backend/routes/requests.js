@@ -40,7 +40,7 @@ router.get('/:requestId', verifyAdvisorJWT, async (req, res) => {
 
   const { data: request, error } = await supabase
     .from('requests')
-    .select('id, project_name, status, created_at, metadata')
+    .select('id, project_name, status, share_token, created_at, metadata')
     .eq('id', requestId)
     .eq('created_by', advisorId)
     .single();
