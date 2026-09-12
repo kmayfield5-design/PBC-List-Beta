@@ -9,6 +9,9 @@ const { insertItemWithRefCode, AREA_PREFIXES } = require('../lib/refCode');
 const {
   parseSort, parseFilters, parsePagination, applyFilters, computeFacet,
 } = require('../lib/itemsQuery');
+const {
+  CLIENT_ITEM_SELECT, serializeClientItem, serializeClientItems,
+} = require('../lib/clientSerializer');
 
 const router = express.Router();
 const upload = multer({
@@ -264,7 +267,7 @@ router.get('/:requestId/my-items', verifyJWT, async (req, res) => {
 
   const { data: items, error: itemsError } = await supabase
     .from('request_items')
-    .select('id, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+    .select(CLIENT_ITEM_SELECT)
     .eq('request_id', requestId)
     .eq('contact_email', email.toLowerCase())
     .order('deadline', { ascending: true, nullsFirst: false });
@@ -274,7 +277,7 @@ router.get('/:requestId/my-items', verifyJWT, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to load items.' });
   }
 
-  return res.json({ success: true, request, items });
+  return res.json({ success: true, request, items: serializeClientItems(items) });
 });
 
 /**
@@ -335,7 +338,7 @@ router.post(
         status: item.status === 'pending' ? 'uploaded' : item.status,
       })
       .eq('id', itemId)
-      .select('id, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+      .select(CLIENT_ITEM_SELECT)
       .single();
 
     if (updateError || !updatedItem) {
@@ -353,7 +356,7 @@ router.post(
       details: { item_id: itemId, file_path: storagePath, file_name: req.file.originalname },
     });
 
-    return res.json({ success: true, item: updatedItem });
+    return res.json({ success: true, item: serializeClientItem(updatedItem) });
   }
 );
 

@@ -70,7 +70,7 @@ export default function UploadPage() {
             .single(),
           supabase
             .from('request_items')
-            .select('id, area, item_name, contact_email, owner, deadline, status, file_path, uploaded_at, notes')
+            .select('id, ref_code, area, item_name, contact_email, description, period, expected_format, deadline, status, file_path, uploaded_at')
             .eq('request_id', requestId)
             .order('area', { ascending: true, nullsFirst: false })
             .order('deadline', { ascending: true, nullsFirst: false }),
@@ -132,7 +132,7 @@ export default function UploadPage() {
         status: newStatus,
       })
       .eq('id', itemId)
-      .select('id, area, item_name, owner, deadline, status, file_path, uploaded_at, notes')
+      .select('id, ref_code, area, item_name, contact_email, description, period, expected_format, deadline, status, file_path, uploaded_at')
       .single();
 
     if (!updateError && updatedItem) {
@@ -199,7 +199,6 @@ export default function UploadPage() {
                 <tr>
                   <th style={styles.th}>Item</th>
                   <th style={styles.th}>Assigned to</th>
-                  <th style={styles.th}>Owner</th>
                   <th style={styles.th}>Deadline</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>File</th>
@@ -210,7 +209,7 @@ export default function UploadPage() {
                 {Array.from(grouped.entries()).map(([area, areaItems]) => (
                   <>
                     <tr key={`area-${area}`}>
-                      <td colSpan={7} style={styles.areaHeader}>{area}</td>
+                      <td colSpan={6} style={styles.areaHeader}>{area}</td>
                     </tr>
                     {areaItems.map((item) => {
                       const isUploading = uploading.has(item.id);
@@ -221,7 +220,7 @@ export default function UploadPage() {
                         <tr key={item.id} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.itemName}>{item.item_name}</span>
-                            {item.notes && <span style={styles.notes}>{item.notes}</span>}
+                            {item.description && <span style={styles.notes}>{item.description}</span>}
                           </td>
                           <td style={styles.td}>
                             <span style={{ fontSize: '13px', color: '#4c6382' }}>
@@ -231,7 +230,6 @@ export default function UploadPage() {
                               <span style={styles.youBadge}>you</span>
                             )}
                           </td>
-                          <td style={styles.td}>{item.owner || '—'}</td>
                           <td style={{ ...styles.td, color: overdue ? '#c0392b' : 'inherit' }}>
                             {formatDeadline(item.deadline)}
                             {overdue && <span style={styles.overdueTag}>Overdue</span>}

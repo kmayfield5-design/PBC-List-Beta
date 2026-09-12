@@ -191,6 +191,9 @@ PBC-List-Beta/
       refCode.js              # generateRefCode + insertItemWithRefCode (concurrent-safe)
       vocabulary.js           # DEFAULT_VOCABULARY constant (mirrors the SQL column default)
       itemsQuery.js           # parseSort, parseFilters, applyFilters, computeFacet helpers
+      clientSerializer.js     # CLIENT_ITEM_FIELDS allowlist + serializeClientItem(s).
+                              #   Use in every client-scoped endpoint — deny-list breaks on
+                              #   new columns; this allowlist fails safe.
     middleware/
       auth.js                 # verifyJWT: validates custom client JWT
       advisorAuth.js          # verifyAdvisorJWT: validates Supabase Auth token via getUser()
@@ -391,6 +394,10 @@ Current coverage:
   `GET /:requestId/items`: auth/ownership check, sort validation (400 on invalid
   field), response shape (items/total/page/limit/facets), pagination clamping, and
   every filter parameter accepted without 4xx.
+- `backend/__tests__/clientItems.test.js` — Serializer unit tests (every forbidden
+  field stripped even when DB returns it; allowed fields preserved; null/non-array
+  input safe) plus integration tests for `GET /:requestId/my-items` asserting that
+  each field in `CLIENT_ITEM_FORBIDDEN` is absent from every response item.
 
 Supertest (`supertest@^7`) is also installed as a dev dependency.
 
